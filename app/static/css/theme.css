@@ -1,0 +1,69 @@
+/*
+ * Design tokens only — no component CSS lives here (milestone M3 styles the shelf).
+ * Light theme is the default on :root; the data-theme attribute on <html>
+ * (see base.html) switches to the dark palette. Names refer to the physical
+ * thing they paint: wooden shelf, cloth spine, ink on paper.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Wood tones: shelf boards, back panel, shadow under books. */
+  --wood-shelf: #b8875b;
+  --wood-shelf-dark: #8a5f3c;
+  --wood-back-panel: #6f4a2d;
+  --wood-shadow: rgba(74, 46, 24, 0.35);
+
+  /* Cloth tones: generated spine colours (hash of author name picks from these). */
+  --cloth-crimson: #9a3b3b;
+  --cloth-forest: #3f6b45;
+  --cloth-navy: #35486b;
+  --cloth-sand: #b9a179;
+  --cloth-plum: #6b4570;
+  --cloth-slate: #4c5a63;
+
+  /* Ink and paper. */
+  --ink: #241c14;
+  --ink-muted: #5c5248;
+  --paper: #f6f1e7;
+  --paper-raised: #fffdf8;
+
+  /* Focus ring for keyboard navigation; visible on both paper and wood. */
+  --focus-ring: #b3541e;
+  --focus-ring-offset: #f6f1e7;
+
+  /* Motion: shelf flip and hover transitions (M3 consumes these). */
+  --motion-duration: 220ms;
+  --motion-ease: ease-out;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --wood-shelf: #7a5636;
+  --wood-shelf-dark: #4e3520;
+  --wood-back-panel: #33220f;
+  --wood-shadow: rgba(0, 0, 0, 0.55);
+
+  --cloth-crimson: #b05252;
+  --cloth-forest: #578a5f;
+  --cloth-navy: #4d6794;
+  --cloth-sand: #c9b189;
+  --cloth-plum: #8f6596;
+  --cloth-slate: #6a7b87;
+
+  --ink: #ece4d6;
+  --ink-muted: #a99c8a;
+  --paper: #1e1913;
+  --paper-raised: #2a231b;
+
+  --focus-ring: #e78a4e;
+  --focus-ring-offset: #1e1913;
+}
+
+/* Reduced motion: the spine flip and any transitions collapse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration: 0ms;
+  }
+}

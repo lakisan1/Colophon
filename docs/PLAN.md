@@ -4,10 +4,14 @@ One milestone at a time, serial (single local model instance per global rule). A
 when its verification command passes **and** the assistant has re-run that command itself. Two failures on
 the same task → park it in `docs/QUESTIONS.md` and move to the next independent milestone.
 
-- [ ] **M0 Scaffold** — pinned `requirements.txt`, `.venv`, ruff, pytest, Alembic, `Makefile`, `docker-compose.yml`,
+- [x] **M0 Scaffold** — pinned `requirements.txt`, `.venv`, ruff, pytest, Alembic, `Makefile`, `docker-compose.yml`,
       `app/` package, `current_user` dependency with dev bypass, `/healthz`, `LICENSE` (AGPL-3.0),
       English `README.md` rewrite + `docs/SPEC.md` split, `docs/GITHUB.md`.
       _Verify:_ `make test` green, `make lint` clean, `uvicorn` boots and `curl /healthz` returns 200.
+      _Done 2027-08-27, re-verified by the orchestrator:_ `pytest -q` → 5 passed, `ruff check .` → clean,
+      `ruff format --check .` → 21 files already formatted, `import app.main` ok, `/healthz` → 200,
+      pins confirmed installed (fastapi 0.141.1, uvicorn 0.52.4, SQLAlchemy 2.0.52, alembic 1.19.1,
+      bcrypt 5.0.0, pillow 12.3.0, httpx 0.28.1).
 - [ ] **M1 Schema** — tables `users, books, authors, series, genres, rooms, loans, photos, settings`,
       migrations, ISBN-10/13 normalise+validate util, hardcoded `genres.py` / `formats.py`.
       _Verify:_ `alembic upgrade head && alembic downgrade base` clean; unit tests on ISBN.

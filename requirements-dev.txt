@@ -1,0 +1,10 @@
+# Development-only tools on top of the runtime pins. httpx is re-listed because
+# starlette's TestClient drives it; the pin must match requirements.txt.
+-r requirements.txt
+httpx==0.28.1
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
+pytest==9.1.1
+ruff==0.16.4

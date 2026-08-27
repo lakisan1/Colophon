@@ -1,0 +1,21 @@
+<!doctype html>
+{# Root shell of every page. data-theme drives light/dark tokens (theme.css);
+   the user-facing theme switcher arrives with settings in M5. #}
+<html lang="en" data-theme="{{ theme | default('light', true) }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ page_title | default('Colophon', true) }}{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/theme.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-title" href="/">Colophon</a>
+    </header>
+    <main class="site-main">
+      {% block content %}
+      <p class="placeholder">{{ placeholder | default('Colophon scaffold is running.', true) }}</p>
+      {% endblock %}
+    </main>
+  </body>
+</html>

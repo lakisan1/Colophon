@@ -1,0 +1,25 @@
+# Local development stack. A named volume persists the SQLite file and uploaded
+# photos across restarts. All env vars are defined by app/settings.py.
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Signs session cookies. MUST be replaced for anything beyond localhost.
+      COLOPHON_SECRET_KEY: "change-me-local-dev-only"
+      # SQLite file and photo directory inside the named volume (absolute paths).
+      COLOPHON_DB_PATH: /data/colophon.sqlite3
+      COLOPHON_UPLOAD_DIR: /data/uploads
+      # Un-comment to skip login entirely. Development only, never a real deploy.
+      # COLOPHON_DEV_AUTH_BYPASS: "1"
+      # Optional Google Books lookup key (T5); the app works fully without it.
+      # GOOGLE_BOOKS_KEY: ""
+      # Behind a reverse proxy, set the proxy's network so rate limiting keys on
+      # real client IPs instead of the proxy (T9). Read by uvicorn directly.
+      # FORWARDED_ALLOW_IPS: ""
+    volumes:
+      - colophon-data:/data
+
+volumes:
+  colophon-data:

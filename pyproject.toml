@@ -1,0 +1,32 @@
+# Tooling config only. Colophon is an application, not a distributable package,
+# so there is no [build-system]/[project] table on purpose.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Deliberately a modest ruleset: pyflakes + pycodestyle + imports + a few
+# modernisation bug-catchers. Extend rules, never blanket-ignore them.
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff's own rules
+]
+
+[tool.ruff.lint.isort]
+# The project is `app`; without these two lines ruff misreads the local alembic/
+# directory as the alembic package when sorting alembic/env.py imports.
+known-first-party = ["app"]
+known-third-party = ["alembic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Make the project root importable so tests can `import app` without installs.
+pythonpath = ["."]
