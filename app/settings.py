@@ -29,6 +29,7 @@ class Settings:
     secret_key: str
     database_url: str
     upload_dir: str
+    backup_dir: str
     dev_auth_bypass: bool
     google_books_key: str | None
     cookie_secure: bool
@@ -42,10 +43,15 @@ def load_settings() -> Settings:
     # choice rather than a stylistic one.
     db_path = _project_path(os.environ.get("COLOPHON_DB_PATH", "data/colophon.sqlite3"))
     upload_dir = _project_path(os.environ.get("COLOPHON_UPLOAD_DIR", "data/photos"))
+    # SPEC §14/T10: nightly backups of both of the above, 30-day retention, and the
+    # directory they land in must never be web-served. It sits next to the data it
+    # copies so one volume mount carries the library and its recovery plan.
+    backup_dir = _project_path(os.environ.get("COLOPHON_BACKUP_DIR", "data/backups"))
     return Settings(
         secret_key=os.environ.get("COLOPHON_SECRET_KEY", DEV_FALLBACK_SECRET_KEY),
         database_url=f"sqlite:///{db_path}",
         upload_dir=str(upload_dir),
+        backup_dir=str(backup_dir),
         dev_auth_bypass=_env_flag("COLOPHON_DEV_AUTH_BYPASS"),
         # T5 names this variable literally, without the COLOPHON_ prefix.
         google_books_key=os.environ.get("GOOGLE_BOOKS_KEY") or None,

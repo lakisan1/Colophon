@@ -100,6 +100,17 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       _Also:_ prices go through `app/money.py` (the Gone shelf printed raw `95.0`), and the fixture keeps its
       no-invented-ISBN rule (`test_no_isbn_is_invented_by_the_fixture`), which means the demo's ISBN column is
       empty on purpose — a fake ISBN would resolve to a different real book upstream.
+- [ ] **M7 Hardening + packaging** — nightly backup with 30-day retention including photos (Python
+      `sqlite3` backup API, never the CLI, and the backup directory is never web-served: T10), non-root
+      Docker image with a healthcheck, one uvicorn worker and `FORWARDED_ALLOW_IPS` documented (T2/T9),
+      CI running the same gate this project keeps its milestones by, CONTRIBUTING, README final pass.
+      _Verify:_ a backup is taken from a database with data, the original is destroyed, the backup is
+      restored, and the restored library still counts the same books and the same photo files; retention
+      prunes exactly the files older than 30 days; `docker build` succeeds and the image starts and answers
+      `/healthz`; `ruff` and `pytest` are the CI gate, not a lighter subset.
+      _Note:_ SPEC line "Milestones M0–M7 are defined in docs/PLAN.md" was true of the plan's intent but this
+      entry had never been written down; it is reconstructed here from SPEC §14, T2/T9/T10 and the ownership
+      table in docs/AUTOMATION.md, so M7 is verifiable rather than improvised at the end.
 ## Standing constraints for every agent
 
 Model calls: at most one DeepSeek and one Qwen at a time, never two of the same model (T13). Never push to git. Never touch files outside this project directory.
