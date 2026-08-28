@@ -50,6 +50,24 @@ file lose work silently. Declared ownership:
 Rule: `app/main.py` and `app/deps.py` belong to the orchestrator. A worker that needs wiring describes the
 change in its report instead of editing shared files.
 
+## Model servers: check these first
+
+Both models are self-hosted on the LAN (`~/.dsh/settings.yaml`): `local` = `deepseek-v4-flash` on
+`192.168.1.30:8000`, `local2` = `qwen3.8-flash-next` on `192.168.1.31:8080`. Hosted DeepSeek is never
+used, and a failed call is reported, never re-routed to another provider.
+
+```
+curl -s -m 6 http://192.168.1.30:8000/v1/models   # deepseek
+curl -s -m 6 http://192.168.1.31:8080/v1/models   # qwen
+```
+
+A stalled or empty agent report means run these two curls **before** reading any code. A server that is
+down or thrashing looks exactly like an agent that gave up. Both answered on 2026-08-28, which is why
+the 8-hour M2 stall was attributed to nobody-was-looking rather than to infrastructure.
+
+Concurrency limit, restated from T13: one `local` and one `local2` in flight at most, never two of the
+same. Background `bash` jobs are free to overlap — they make no model calls.
+
 ## Death protocol
 
 When an agent dies (empty closing message, `list_agents` status without a report):
