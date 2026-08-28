@@ -4,7 +4,7 @@
 VENV := .venv
 PIP := $(VENV)/bin/pip
 
-.PHONY: venv dev test lint fmt migrate
+.PHONY: venv dev test lint fmt migrate seed
 
 venv:
 	python3 -m venv $(VENV)
@@ -26,3 +26,8 @@ fmt:
 
 migrate:
 	$(VENV)/bin/alembic upgrade head
+
+# Dev/demo fixture (M2). Rebuilds only the demo user's rows, so it is safe to
+# re-run against a database that already holds other data.
+seed:
+	$(VENV)/bin/python -m app.seed

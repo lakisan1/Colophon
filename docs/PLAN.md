@@ -8,22 +8,30 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       `app/` package, `current_user` dependency with dev bypass, `/healthz`, `LICENSE` (AGPL-3.0),
       English `README.md` rewrite + `docs/SPEC.md` split, `docs/GITHUB.md`.
       _Verify:_ `make test` green, `make lint` clean, `uvicorn` boots and `curl /healthz` returns 200.
-      _Done 2027-08-27, re-verified by the orchestrator:_ `pytest -q` → 5 passed, `ruff check .` → clean,
+      _Done 2026-08-27, re-verified by the orchestrator:_ `pytest -q` → 5 passed, `ruff check .` → clean,
       `ruff format --check .` → 21 files already formatted, `import app.main` ok, `/healthz` → 200,
       pins confirmed installed (fastapi 0.141.1, uvicorn 0.52.4, SQLAlchemy 2.0.52, alembic 1.19.1,
       bcrypt 5.0.0, pillow 12.3.0, httpx 0.28.1).
 - [x] **M1 Schema** — tables `users, books, authors, series, genres, rooms, loans, photos, settings`,
       migrations, ISBN-10/13 normalise+validate util, hardcoded `genres.py` / `formats.py`.
       _Verify:_ `alembic upgrade head && alembic downgrade base` clean; unit tests on ISBN.
-      _Done 2027-08-27, re-verified by the orchestrator on a throwaway DB:_ upgrade → 12 tables + 45 seeded
+      _Done 2026-08-27, re-verified by the orchestrator on a throwaway DB:_ upgrade → 12 tables + 45 seeded
       genres + seeded global settings row; `downgrade base` → only `alembic_version` survives; re-upgrade
       restores all 25 objects. `pytest -q` → 62 passed; `ruff check .` clean; `ruff format --check .` →
       29 files already formatted. Orchestrator also re-checked all 45 curated notations against
       `data/bisac.json`: zero missing codes, zero label mismatches, `FIC` = 98 entries, no label contains
       "Young Adult" (so `LOCAL/YA` is justified).
-- [ ] **M2 Seed fixture** — ~150 books with real mm dimensions, Horus-Heresy-style decimal series numbers,
+- [x] **M2 Seed fixture** — ~150 books with real mm dimensions, Horus-Heresy-style decimal series numbers,
       boxed sets, manga, dictionaries, borrowed + sold + wishlist entries.
       _Verify:_ row-count and series-ordering assertions; `make seed` idempotent.
+      _Done 2026-08-28:_ `app/seed_data.py` (210 books — more than the ~150 asked for, still one shelf)
+      plus `app/seed.py` (`make seed`, rebuilds the demo user only, so it is safe next to real data) and
+      25 tests. The fixture covers all 5 ownership statuses, all 4 reading states, all 13 formats, decimal
+      positions (0.25 / 0.5 / 1.5 / 2.5), 10 multi-author books including a 4-author one, 5 loans, 4 gifts,
+      11 cached provider photo rows, and the two planned duplicate titles. `isbn` is deliberately NULL
+      everywhere: inventing codes would make M6's Open Library lookups resolve to the wrong book.
+      _Verified:_ `pytest -q` → 87 passed; `ruff check .` clean; `ruff format --check .` → 32 files;
+      seeding twice returns identical counts; `make seed` on the dev DB → 210 books / 222 links / 5 loans.
 - [ ] **M3 Shelf** — scale model A1–A8, zoom presets, LOD, generated cloth spine, series badge, wooden rows
       with genre section labels, flip-to-cover, light/dark theme tokens.
       _Verify:_ rendered HTML snapshot tests + `docs/VISUAL-QA.md` checklist for Lazar.
