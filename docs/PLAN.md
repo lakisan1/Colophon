@@ -116,3 +116,52 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
 Model calls: at most one DeepSeek and one Qwen at a time, never two of the same model (T13). Never push to git. Never touch files outside this project directory.
 `docs/DECISIONS.md` wins over `README.md` on any conflict.
 Heartbeat + `scripts/doctor.sh` + `STATE.json` keep the run observable: see `docs/AUTOMATION.md`. Read `docs/ASSUMPTIONS.md` before assuming anything new.
+
+## M8 — UI feedback from the first real session (Lazar, 2026-08-28, late)
+
+Heard while looking at the running app with real data. Ordered as worked, not as received.
+
+**0. Two accounts, one library — RESOLVED as data, with a product follow-up.**
+The `admin` account was a leftover of an agent's probe, so the seeded catalogue (210 books + rooms)
+belonged to `demo` while the new books went to `admin`: the shelf looked two-thirds empty. Ownership was
+moved to the account in use (backed up first with `app.tools.backup`, restored once when a cleanup of mine
+deleted good rows — see the git log). Verified: shelf 1 renders 183 owned, `/borrowed` 5, `/gone` 12,
+`/wishlist` 12 — all 212 books accounted for across the four shelves.
+_Product follow-up, not yet done_: a brand-new account sees a silent empty shelf with no hint that the
+catalogue lives on another owner, and no way to move a book's owner in the UI. Worth a small M8.1.
+
+**1. Dark theme does not reach the edit page.** Accept: every field, panel, button and photo slot on
+`/book/{id}/edit` and `/settings` is legible in dark mode; a test renders the edit page with the dark theme
+preference and asserts no light-surface token is applied to a text-bearing element.
+
+**2. Search inputs have poor contrast in dark mode.** Accept: input text, placeholder and the query string
+itself meet WCAG AA (>= 4.5:1) against the dark surface, measured in a test that reads the token values,
+not eyeballed.
+
+**3. Confirm any book dimension over 500 mm.** Accept: the form asks before saving when width, height or
+thickness exceeds 500 mm, naming the field and the value; the guard is server-side as well as in JS, so
+disabling JS cannot bypass it; a test posts 700 mm and gets the confirmation rather than a saved row.
+Motivation: the first real entry typed 700 mm for a paperback width.
+
+**4. Crop must be visual, not numeric.** Accept: choosing a photo opens a crop overlay on the image itself;
+the overlay's aspect ratio is locked from the book's own width and height for the slot (front and back use
+height:width, spine uses thickness:height), so the cropped image matches the physical book rather than a
+guessed box; entering numbers manually is gone; a book without dimensions is told to enter them first, and
+the server refuses a crop for a book with no dimensions. Depends on: nothing, but it will collide with the
+form work, so it goes after item 3.
+
+**5. Spines are monotonous: generate colour variants.** Accept: several distinct generated spine palettes
+(plus paper/boards texture and foil-ish title treatment where CSS allows), assigned pseudo-randomly and
+**stably** — the same book keeps the same spine on every reload and after a restart — to books with no
+uploaded spine image; a test asserts variety across the shelf (not all one palette) and stability across two
+renders of the same book.
+
+**6. The design is bare bones, and the shelves want more shelves.** Accept: layout, typography and depth
+read as a deliberate product rather than a wireframe, and the shelf reads as wooden furniture with visible
+tiers rather than a flat row. Constraint from SPEC §13: no framework, no build step, no bundler — vanilla
+CSS and progressive enhancement only, and the page must still work with JS disabled.
+
+Order of work and file ownership, so agents do not collide: items 1+2+3 (theme tokens, forms CSS, the
+dimension guard) → items 4 (form and photo JS) → items 5+6 (spine palettes and shelf furniture).
+M8 closes with a real session in the browser at both zoom presets, in both themes, screenshots in
+`docs/screenshots/`, and the full suite green.
