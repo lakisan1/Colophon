@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import Engine, text
+from sqlalchemy.orm import sessionmaker
 
+from app.deps import _seeded_demo_user
 from app.formats import FORMAT_BY_KEY
 from app.seed import SeedSummary, dimensions, seed, sort_key
 from app.seed_data import BOOKS, DEMO_USERNAME, GIFTS, LOANS, PHOTO_PROVIDERS, ROOMS
@@ -357,3 +359,20 @@ def test_dimensions_are_deterministic_and_format_shaped() -> None:
     assert (folio_h, folio_w, folio_t) == (300, 420, 40)
     # A boxed set is thicker than a pocket A6 of the same page count.
     assert dimensions("boxed_set", "X", 100)[2] > dimensions("pocket_a6", "X", 100)[2]
+
+
+def test_dev_bypass_signs_in_as_the_seeded_demo_account(
+    seeded: tuple[Engine, SeedSummary],
+) -> None:
+    """Otherwise `make dev` shows an empty shelf next to the seeded library."""
+    engine, summary = seeded
+    user = _seeded_demo_user(sessionmaker(bind=engine))
+    assert user is not None
+    assert user.username == DEMO_USERNAME
+    assert user.id == summary.user_id
+
+
+def test_dev_bypass_falls_back_on_an_unseeded_database(tmp_path: Path) -> None:
+    # SQLite creates the file on first connect, so this reaches 'no such table'.
+    engine = engine_for(tmp_path / "not-migrated.db")
+    assert _seeded_demo_user(sessionmaker(bind=engine)) is None
