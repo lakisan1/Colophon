@@ -16,7 +16,7 @@
   ],
   "decisions_lazar_may_veto": [
     "M2 fixture ships 210 books instead of ~150",
-    "M2 fixture leaves isbn NULL everywhere (invented ISBNs would make M6 resolve the wrong cover upstream)",
+    "M2 fixture leaves isbn NULL everywhere (invented ISBNs would make M4 resolve the wrong cover upstream)",
     "dev auth bypass signs in as the seeded 'demo' user instead of the synthetic 'dev' one (M5 owns auth)"
   ],
   "blocked": [],

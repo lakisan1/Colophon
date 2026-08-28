@@ -11,9 +11,9 @@
 #   * one duplicate title in two formats (hardcover owned + paperback wanted),
 #     which is what ownership-level dedup has to reason about (D3);
 #   * multi-author rows, including a four-author one (Design Patterns);
-#   * `isbn` is left NULL everywhere. Inventing ISBN-13s would hand M6's Open
+#   * `isbn` is left NULL everywhere. Inventing ISBN-13s would hand M4's Open
 #     Library lookups codes that resolve to the wrong book, which is worse than
-#     no code. M6 ships its own ISBN fixture.
+#     no code. M4 ships its own ISBN fixture.
 from __future__ import annotations
 
 DEMO_USERNAME = "demo"

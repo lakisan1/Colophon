@@ -178,7 +178,7 @@ def test_duplicate_title_rows_differ_by_format(seeded: tuple[Engine, SeedSummary
 
 
 def test_no_isbn_is_invented_by_the_fixture(seeded: tuple[Engine, SeedSummary]) -> None:
-    """M6 supplies ISBNs; fake ones would resolve to the wrong book upstream."""
+    """M4 supplies ISBNs; fake ones would resolve to the wrong book upstream."""
     engine, _ = seeded
     assert _count(engine, "SELECT count(*) FROM books WHERE isbn IS NOT NULL") == 0
 

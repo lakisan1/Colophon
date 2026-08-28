@@ -50,5 +50,6 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
 
 ## Standing constraints for every agent
 
-Serial model calls only. Never push to git. Never touch files outside this project directory.
-`docs/DECISIONS.md` wins over `README.md` on any conflict. Read `docs/ASSUMPTIONS.md` before assuming anything new.
+Model calls: at most one DeepSeek and one Qwen at a time, never two of the same model (T13). Never push to git. Never touch files outside this project directory.
+`docs/DECISIONS.md` wins over `README.md` on any conflict.
+Heartbeat + `scripts/doctor.sh` + `STATE.json` keep the run observable: see `docs/AUTOMATION.md`. Read `docs/ASSUMPTIONS.md` before assuming anything new.
