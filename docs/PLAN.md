@@ -12,9 +12,15 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       `ruff format --check .` → 21 files already formatted, `import app.main` ok, `/healthz` → 200,
       pins confirmed installed (fastapi 0.141.1, uvicorn 0.52.4, SQLAlchemy 2.0.52, alembic 1.19.1,
       bcrypt 5.0.0, pillow 12.3.0, httpx 0.28.1).
-- [ ] **M1 Schema** — tables `users, books, authors, series, genres, rooms, loans, photos, settings`,
+- [x] **M1 Schema** — tables `users, books, authors, series, genres, rooms, loans, photos, settings`,
       migrations, ISBN-10/13 normalise+validate util, hardcoded `genres.py` / `formats.py`.
       _Verify:_ `alembic upgrade head && alembic downgrade base` clean; unit tests on ISBN.
+      _Done 2027-08-27, re-verified by the orchestrator on a throwaway DB:_ upgrade → 12 tables + 45 seeded
+      genres + seeded global settings row; `downgrade base` → only `alembic_version` survives; re-upgrade
+      restores all 25 objects. `pytest -q` → 62 passed; `ruff check .` clean; `ruff format --check .` →
+      29 files already formatted. Orchestrator also re-checked all 45 curated notations against
+      `data/bisac.json`: zero missing codes, zero label mismatches, `FIC` = 98 entries, no label contains
+      "Young Adult" (so `LOCAL/YA` is justified).
 - [ ] **M2 Seed fixture** — ~150 books with real mm dimensions, Horus-Heresy-style decimal series numbers,
       boxed sets, manga, dictionaries, borrowed + sold + wishlist entries.
       _Verify:_ row-count and series-ordering assertions; `make seed` idempotent.
