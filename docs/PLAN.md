@@ -77,13 +77,29 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       _Bug the tests caught:_ failures were counted across both throttle keys at once, so the same attempt
       counted twice and the account locked on the **third** try instead of the fifth. `is_locked_out` now
       checks each key independently.
-- [ ] **M6 Shelves 2–4, search, stats, export** — borrowed / gone / wishlist, server-side filtering,
+- [x] **M6 Shelves 2–4, search, stats, export** — borrowed / gone / wishlist, server-side filtering,
       author-across-genres filter, FTS search, dashboard, CSV + JSON export, rooms filter.
       _Verify:_ filter truth-table tests; export round-trips through a parser.
-- [ ] **M7 Hardening + packaging** — nightly backup script (Python `sqlite3` backup API + photos, 30d retention),
-      non-root Dockerfile, healthcheck, `FORWARDED_ALLOW_IPS` docs, CI (ruff+pytest), CONTRIBUTING, final README.
-      _Verify:_ `docker build` succeeds; backup script produces a restorable file in a temp dir.
-
+      _Done 2026-08-28:_ migration `0003` (FTS5 index + 10 triggers), `app/filters.py` (pure parse → bound
+      WHERE fragments), `app/search.py` (safe MATCH builder), `app/stats.py`, `app/export.py`,
+      `app/routers/export.py`, `/borrowed`, `/gone`, `/wishlist`, `/search`, `/stats`,
+      plus `GET /book/{id}` (read-only record) because a shelf with no way into a book is a dead end.
+      105 new tests: filter truth table (52), search (15), shelves (20), export round-trip (11),
+      book page (11), money (6).
+      _Verified:_ `pytest -q` → 331 passed; `ruff check .` clean; `ruff format --check .` clean (69 files);
+      live server (login as the demo user): `/` 181 spines, `/?room=1` 53, `/?author=1` 4,
+      `/search?q=dun` 6 hits, `/stats` 200, `/export.csv` 210 rows, `/export.json` 210 objects,
+      `/book/1` 200, and 181 spine links from the shelf.
+      _Bugs this found by running the app, not by reading code:_
+      1. the dev database sat at migration `0001`, so **login returned 500** (`no such table: login_attempts`)
+         — tests build throwaway databases and never looked at that file. `scripts/doctor.sh` now reports
+         schema drift and `make serve` migrates first.
+      2. the book page rendered `<img>` for `photos` rows with no bytes on disk (broken icons). Pages now ask
+         the same question the serving route asks — are there bytes? — and `test_no_image_on_a_shelf_or_record_page_is_broken`
+         fetches every image a page points at.
+      _Also:_ prices go through `app/money.py` (the Gone shelf printed raw `95.0`), and the fixture keeps its
+      no-invented-ISBN rule (`test_no_isbn_is_invented_by_the_fixture`), which means the demo's ISBN column is
+      empty on purpose — a fake ISBN would resolve to a different real book upstream.
 ## Standing constraints for every agent
 
 Model calls: at most one DeepSeek and one Qwen at a time, never two of the same model (T13). Never push to git. Never touch files outside this project directory.

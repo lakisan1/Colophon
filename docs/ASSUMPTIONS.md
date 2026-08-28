@@ -3,6 +3,30 @@
 Every decision the assistant made without asking, newest first. Lazar's morning job is to veto entries,
 not to answer questions. Format: date, what was decided, one-line reason, what to change if vetoed.
 
+- 2026-08-28 (**M6**) — **SQLite file and photos default to `data/`** (`data/colophon.sqlite3`,
+  `data/photos/`). SPEC §14/D13 say so and it is the directory the Docker volume is mounted on; with the old
+  root-level defaults a container rebuild would have silently lost the library. Veto = `load_settings()` in
+  `app/settings.py` plus `docker-compose.yml`.
+- 2026-08-28 (**M6**) — **`make serve` runs `alembic upgrade head` first, and `scripts/doctor.sh` reports
+  schema drift as RED.** Login 500'd on `no such table: login_attempts` because the dev file predated M5;
+  nothing in the suite could see it, since every test migrates its own database. Veto = the `serve` target
+  and the drift block in `doctor.sh`.
+- 2026-08-28 (**M6**) — **A book page (`GET /book/{id}`) exists even though PLAN never scheduled one.**
+  SPEC §(A6) refers to "the detail page", and a shelf whose spines go nowhere is not usable. Read-only;
+  editing stays on `/book/{id}/edit`. Veto = delete the route and link the spines to the edit page instead.
+- 2026-08-28 (**M6**) — **Pages render only photos whose bytes exist on disk.** A `photos` row can name a
+  provider file that was never downloaded, and an `<img>` for it is a broken icon in the middle of a record;
+  the page says "recorded without a stored file" instead. Veto = `photos` / `missing_photo_files` in
+  `app/routers/books.py`.
+- 2026-08-28 (**M6**) — **Price display: symbol before the number, two decimals, comma thousands grouping**
+  (`€1,234.50`), in `app/money.py`. SPEC §10 only requires a plain number with the Settings symbol, so the
+  rest is a display decision; English grouping follows SPEC's English UI, and a Serbian `1.234,56` would be
+  a locale decision the app has no mechanism for in v1. Veto = one function.
+- 2026-08-28 (**M6**) — **The demo fixture still has no ISBNs**, so the export's `isbn` column and the ISBN
+  branch of search are empty for demo rows. The M2 decision stands (`test_no_isbn_is_invented_by_the_fixture`:
+  a fabricated ISBN can resolve to a different real book in M4's lookup) and SPEC says no fake data. Veto =
+  seed real ISBNs for the real titles in the fixture.
+
 - 2026-08-28 (**M5**) — **`Secure` on the session cookie is off by default**, switched on with
   `COLOPHON_COOKIE_SECURE=1`. SPEC §13 asks for HttpOnly (always on) but says nothing about Secure, and with it
   on, a plain-HTTP LAN install cannot sign in at all — httpx and browsers both refuse to return a Secure cookie

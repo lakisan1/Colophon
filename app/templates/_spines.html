@@ -1,0 +1,52 @@
+{# The spines themselves (M3), shared by the library, the wishlist and the search
+   results so a hit renders exactly as it does on its own shelf. #}
+{% for section in sections %}
+  {# A8: each genre section scrolls horizontally on its own, with the label pinned,
+     because a wrapped grid would destroy the physical metaphor. #}
+  <section class="shelf-section" data-genre="{{ section.notation }}" aria-label="{{ section.label }}">
+    <h2 class="shelf-section-label">{{ section.label }}</h2>
+    <ol class="shelf-row" style="--row-height: {{ section.row_px }}px;">
+      {% for spine in section.spines %}
+        {# A4: level of detail is a class, chosen from the rendered spine width. #}
+        <li class="book lod-{{ spine.lod }}{% if spine.has_provider_cover %} has-cover{% endif %}"
+            data-book-id="{{ spine.book_id }}"
+            style="--book-height: {{ spine.height_px }}px;
+                   --book-width: {{ spine.width_px }}px;
+                   --cloth-hue: {{ spine.cloth_hue }};"
+            tabindex="0"
+            title="{{ spine.label }}"
+            aria-label="{{ spine.label }}">
+          <div class="book-3d">
+            {# A5: generated cloth spine. A real spine photo replaces this via
+               --spine-image once there are image bytes on disk. #}
+            <div class="face face-spine">
+              <span class="spine-headband" aria-hidden="true"></span>
+              {# The title+author text is the plain link to the book page, so
+                 opening a book needs no JavaScript at all (mouse, keyboard or
+                 a browser with scripts off). The flip stays for touch users:
+                 shelf.js skips clicks that land on this link. #}
+              <a class="spine-link" href="/book/{{ spine.book_id }}">
+                {% if spine.lod != "sliver" %}
+                  <span class="spine-title">{{ spine.title }}</span>
+                {% endif %}
+                {% if spine.lod == "full" %}
+                  <span class="spine-author">{{ spine.author_label }}</span>
+                {% endif %}
+              </a>
+              {# D9: series badge, only where the spine is wide enough to show it. #}
+              {% if spine.lod == "full" and spine.badge %}
+                <span class="series-badge">{{ spine.badge }}</span>
+              {% endif %}
+            </div>
+            {# A6: the back face of the flip. Cover art shows here when we have it;
+               until then it is a paper card with the title, not a broken image. #}
+            <div class="face face-cover">
+              <span class="cover-title">{{ spine.title }}</span>
+              <span class="cover-author">{{ spine.author_label }}</span>
+            </div>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+{% endfor %}

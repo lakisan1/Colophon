@@ -49,6 +49,19 @@ if [[ "$dirty" != "0" ]]; then
   notes+=("working tree has ${dirty} uncommitted paths — something stopped mid-edit")
 fi
 
+# --- schema drift: a dev DB left behind head does not fail loudly, it 500s on
+# "no such table" the first time someone logs in. The M6 smoke test hit exactly
+# this, because tests build their own database and never look at this file. ---
+db_file="${COLOPHON_DB_PATH:-data/colophon.sqlite3}"
+if [[ -f "$db_file" && -x .venv/bin/alembic ]]; then
+  db_rev=$(.venv/bin/alembic current 2>/dev/null | grep -oE '^[0-9a-z_]+' | head -1)
+  head_rev=$(.venv/bin/alembic heads 2>/dev/null | grep -oE '^[0-9a-z_]+' | head -1)
+  if [[ -n "$head_rev" && "$db_rev" != "$head_rev" ]]; then
+    red=1
+    notes+=("schema drift: ${db_file} is at '${db_rev:-nothing}', head is ${head_rev} — run 'make migrate'")
+  fi
+fi
+
 # --- gate ---
 if [[ $run_tests -eq 1 ]]; then
   if [[ -x .venv/bin/pytest ]]; then

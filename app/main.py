@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import CsrfFailed, LoginRequired
-from app.routers import auth, books, healthz, shelf
+from app.routers import auth, books, export, healthz, shelf
 from app.routers import settings as settings_router
 from app.templating import STATIC_DIR
 
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(shelf.router)
     app.include_router(settings_router.router)
     app.include_router(books.router)
+    app.include_router(export.router)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     @app.exception_handler(LoginRequired)

@@ -1,0 +1,67 @@
+{# Shelf 3 (SPEC §3): sold and gifted share one shelf, with a filter that
+   distinguishes them. Sold keeps price and where, gifted keeps to whom and the note. #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/shelf.css">
+{% endblock %}
+
+{% block content %}
+  {% include "_nav.html" %}
+
+  <div class="shelf-toolbar">
+    <h1 class="shelf-heading">
+      Gone
+      <span class="shelf-count">{{ book_count }}{% if book_count != 1 %} books{% else %} book{% endif %} gone</span>
+    </h1>
+    <nav class="kind-switch" aria-label="Filter the Gone shelf">
+      {% for kind, label in [("", "All"), ("sold", "Sold"), ("gifted", "Gifted")] %}
+        {% if (filters.gone_kind or "") == kind %}
+          <span class="kind is-current" aria-current="true">{{ label }}</span>
+        {% else %}
+          <a class="kind" href="/gone{% if kind %}?kind={{ kind }}{% endif %}">{{ label }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+  </div>
+
+  {% include "_filters.html" %}
+
+  {% if not rows %}
+    <p class="shelf-empty">
+      {% if has_filters %}Nothing gone matches those filters. <a href="/gone">Clear them</a>.
+      {% else %}Nothing has been sold or gifted yet.{% endif %}
+    </p>
+  {% else %}
+    <table class="data-table">
+      <caption class="sr-only">Sold and gifted books</caption>
+      <thead>
+        <tr>
+          <th scope="col">Book</th>
+          <th scope="col">Author</th>
+          <th scope="col">How</th>
+          <th scope="col">To whom / where</th>
+          <th scope="col">Price</th>
+          <th scope="col">Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <th scope="row"><a href="/book/{{ row.book_id }}/edit">{{ row.title }}</a></th>
+            <td>{{ row.author_label }}</td>
+            <td>{{ row.status }}</td>
+            <td>
+              {% if row.status == 'gifted' %}{{ row.gifted_to or '—' }}
+              {% else %}{{ row.where_bought or '—' }}{% endif %}
+            </td>
+            <td class="numeric">
+              {{ row.price_text if row.price_text else '—' }}
+            </td>
+            <td>{{ row.gift_note or '' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

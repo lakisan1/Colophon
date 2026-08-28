@@ -18,7 +18,15 @@
     book.classList.toggle("is-open", !wasOpen);
   }
 
+  function isLink(event) {
+    // The spine's title text is a plain <a> to the book page. A click or an
+    // Enter keypress on it belongs to the browser's navigation, not to the
+    // flip — toggling here would fight the link and hide the cover mid-jump.
+    return Boolean(event.target.closest && event.target.closest("a"));
+  }
+
   document.addEventListener("click", function (event) {
+    if (isLink(event)) return;
     var book = event.target.closest(".book");
     if (book) toggle(book);
   });
@@ -26,6 +34,7 @@
   // Spines are focusable (tabindex in shelf.html), so the keyboard gets the
   // same flip and Escape gives it back.
   document.addEventListener("keydown", function (event) {
+    if (isLink(event)) return;
     var book = event.target.closest ? event.target.closest(".book") : null;
     if (!book) return;
     if (event.key === "Enter" || event.key === " ") {

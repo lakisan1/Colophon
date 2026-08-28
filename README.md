@@ -26,10 +26,15 @@ authentication is milestone M5).
 |---|---|
 | `make venv` | Create `.venv` and install pinned runtime + dev dependencies |
 | `make dev` | Dev server on `0.0.0.0:8000`, reload on, auth bypassed |
+| `make serve` | Same server with **login required** — what you run to look at the app |
 | `make test` | `pytest -q` |
 | `make lint` | `ruff check .` |
 | `make fmt` | `ruff format .` |
 | `make migrate` | `alembic upgrade head` |
+
+Everything the app stores lives under `data/` (SQLite file plus `data/photos/`), which is the
+directory the container volume is mounted on (SPEC §14, D13). It is gitignored; deleting it
+means deleting your library, so back it up (`docs/PLAN.md` M7) before experimenting.
 
 Container alternative: `docker compose up --build` (SQLite file and uploads live in the
 `colophon-data` volume; env vars are documented in `docker-compose.yml`).
@@ -39,8 +44,8 @@ Environment variables (all optional in dev):
 | Variable | Purpose |
 |---|---|
 | `COLOPHON_SECRET_KEY` | Cookie signing key; falls back to an obviously-insecure dev value |
-| `COLOPHON_DB_PATH` | SQLite file path (default `colophon.sqlite3` at the project root) |
-| `COLOPHON_UPLOAD_DIR` | Uploaded photos directory (default `uploads/`) |
+| `COLOPHON_DB_PATH` | SQLite file path (default `data/colophon.sqlite3`) |
+| `COLOPHON_UPLOAD_DIR` | Uploaded photos directory (default `data/photos/`) |
 | `COLOPHON_DEV_AUTH_BYPASS` | Set to `1` to skip login — development only |
 | `GOOGLE_BOOKS_KEY` | Optional Google Books lookup key; the app works fully without it |
 

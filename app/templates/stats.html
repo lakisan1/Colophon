@@ -1,0 +1,47 @@
+{# Dashboard (SPEC §11): the five ownership counts, plus context that costs one
+   query and answers the next question people ask ("how many pages do I own?"). #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/shelf.css">
+{% endblock %}
+
+{% block content %}
+  {% include "_nav.html" %}
+
+  <h1 class="shelf-heading">Statistics</h1>
+
+  <dl class="stat-grid">
+    {% for label, value, href in [
+      ("Owned", stats.owned, "/"),
+      ("Wishlist", stats.wanted, "/wishlist"),
+      ("Borrowed", stats.borrowed, "/borrowed"),
+      ("Sold", stats.sold, "/gone?kind=sold"),
+      ("Gifted", stats.gifted, "/gone?kind=gifted")
+    ] %}
+      <div class="stat">
+        <dt>{{ label }}</dt>
+        <dd><a href="{{ href }}">{{ value }}</a></dd>
+      </div>
+    {% endfor %}
+  </dl>
+
+  <h2 class="stats-subheading">Reading</h2>
+  <dl class="stat-grid">
+    {% for state in reading_states %}
+      <div class="stat">
+        <dt>{{ state }}</dt>
+        <dd>{{ stats.reading.get(state, 0) if stats.reading else 0 }}</dd>
+      </div>
+    {% endfor %}
+  </dl>
+
+  <h2 class="stats-subheading">Collection</h2>
+  <dl class="stat-grid">
+    <div class="stat"><dt>Books recorded</dt><dd>{{ stats.total }}</dd></div>
+    <div class="stat"><dt>Pages owned</dt><dd>{{ stats.pages }}</dd></div>
+    <div class="stat"><dt>Authors</dt><dd>{{ stats.authors }}</dd></div>
+    <div class="stat"><dt>Series</dt><dd>{{ stats.series }}</dd></div>
+    <div class="stat"><dt>Currently out</dt><dd>{{ stats.loans_out }}</dd></div>
+  </dl>
+{% endblock %}

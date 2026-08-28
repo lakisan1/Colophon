@@ -25,6 +25,8 @@ from app.formats import FORMAT_BY_KEY
 from app.forms import read_form
 from app.isbn import normalize_isbn
 from app.lookup import fetch_provider_cover
+from app.money import format_price
+from app.prefs import load_prefs
 from app.settings import settings
 from app.templating import templates
 from app.uploads import SLOTS, UploadError, delete_upload, read_upload, save_upload
@@ -146,6 +148,82 @@ async def update_book(
     return RedirectResponse(url=f"/book/{book_id}/edit?saved=1{suffix}", status_code=303)
 
 
+@router.get("/book/{book_id}", response_class=HTMLResponse)
+def book_page(
+    request: Request,
+    book_id: int,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[Session, Depends(get_session)],
+) -> HTMLResponse:
+    """The read-only record of one book. Declared after /book/new on purpose:
+    FastAPI matches in registration order, and a literal path must win over
+    this one before "new" is tried as an id.
+
+    Nothing here edits: the page is a look, the actions link out. A book that
+    is not this owner's answers with the same 404 as an id that never existed,
+    so the status line alone never confirms that someone else has that book.
+    """
+    book = _load_book(session, user.id, book_id)
+    if book is None:
+        return _not_found(request)
+
+    # Owner scoping happened in _load_book; these lookups hang off rows that
+    # already belong to this owner's book, by primary key.
+    genre_label = None
+    if book["primary_genre_notation"]:
+        genre_label = session.execute(
+            text("SELECT label FROM genres WHERE notation = :n"),
+            {"n": book["primary_genre_notation"]},
+        ).scalar()
+    room_name = None
+    if book["room_id"]:
+        room_name = session.execute(
+            text("SELECT name FROM rooms WHERE id = :r"), {"r": book["room_id"]}
+        ).scalar()
+    # Only the open loan: SPEC §3 shelf 2 is "who has it, since when". A
+    # returned loan is history and must not claim the book is still out.
+    loan = session.execute(
+        text(
+            "SELECT borrowed_to, loaned_at, expected_return_date FROM loans"
+            " WHERE book_id = :book_id AND returned_at IS NULL"
+            " ORDER BY loaned_at LIMIT 1"
+        ),
+        {"book_id": book_id},
+    ).first()
+    # Only slots whose image is actually on disk are rendered (see _photo_bytes);
+    # the rest are counted so the page can say so instead of showing a broken icon.
+    recorded_slots = list(
+        session.execute(
+            text("SELECT slot FROM photos WHERE book_id = :book_id ORDER BY slot"),
+            {"book_id": book_id},
+        ).scalars()
+    )
+    photos = [slot for slot in recorded_slots if _photo_bytes(session, book_id, slot) is not None]
+
+    prefs = load_prefs(session, user.id)
+    fmt = FORMAT_BY_KEY.get(book["format"] or "")
+    return templates.TemplateResponse(
+        request,
+        "book.html",
+        {
+            "user": user,
+            "theme": prefs.theme,
+            "page_title": book["title"],
+            "book": book,
+            "genre_label": genre_label,
+            "room_name": room_name,
+            # An unrecognised stored key is shown verbatim rather than blanked:
+            # a detail page must not hide what the record says.
+            "format_label": fmt.label if fmt else book["format"],
+            "loan": dict(loan._mapping) if loan else None,
+            "photos": photos,
+            "missing_photo_files": len(recorded_slots) - len(photos),
+            "series_position": _series_position_text(book["series_position"]),
+            "price_text": format_price(book["price"], prefs.currency_symbol or "€"),
+        },
+    )
+
+
 @router.post("/book/{book_id}/photos")
 async def add_photo(
     book_id: int,
@@ -232,6 +310,22 @@ def get_photo(
     if slot not in SLOTS or _load_book(session, user.id, book_id) is None:
         return Response(content=b"", status_code=404)
 
+    stored = _photo_bytes(session, book_id, slot)
+    if stored is None:
+        return Response(content=b"", status_code=404)
+    filename, data = stored
+    return Response(content=data, media_type=_media_type(filename))
+
+
+def _photo_bytes(session: Session, book_id: int, slot: str) -> tuple[str, bytes] | None:
+    """The image bytes for one slot, or None.
+
+    An upload wins over a cached provider image (T6). A `photos` row can exist with
+    no file behind it — the M2 fixture records provider filenames, and a provider
+    download can fail after the row was written — so "is there a row" is not the
+    question any page should ask. Pages ask this one, which is why they never render
+    a broken image.
+    """
     filenames = _photo_filenames(session, book_id, slot)
     for key in ("upload_filename", "provider_filename"):
         filename = filenames.get(key)
@@ -239,8 +333,8 @@ def get_photo(
             continue
         data = read_upload(settings.upload_dir, filename)
         if data is not None:
-            return Response(content=data, media_type=_media_type(filename))
-    return Response(content=b"", status_code=404)
+            return filename, data
+    return None
 
 
 # --------------------------------------------------------------------------
@@ -584,6 +678,15 @@ def _photo_filenames(session: Session, book_id: int, slot: str) -> dict:
         {"b": book_id, "s": slot},
     ).first()
     return dict(record._mapping) if record else {}
+
+
+def _series_position_text(position: float | None) -> str | None:
+    """D9 allows decimals (1.5), but a whole position must read "2", not "2.0" —
+    SQLite REAL hands back a float either way."""
+    if position is None:
+        return None
+    number = float(position)
+    return str(int(number)) if number.is_integer() else str(number)
 
 
 def _render_form(

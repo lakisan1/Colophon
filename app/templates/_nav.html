@@ -1,0 +1,19 @@
+{# Shelf navigation (SPEC §3). Plain links, filter-preserving: the query string
+   rides along so filtering does not drop you back to an unfiltered view. #}
+<nav class="shelf-nav" aria-label="Shelves">
+  {% set shelves = [
+    ("/", "My library", "library"),
+    ("/borrowed", "Borrowed", "borrowed"),
+    ("/gone", "Gone", "gone"),
+    ("/wishlist", "Wishlist", "wishlist"),
+    ("/search", "Search", "search"),
+    ("/stats", "Statistics", "stats")
+  ] %}
+  {% for path, label, key in shelves %}
+    {% if key == active_shelf %}
+      <span class="shelf-nav-item is-current" aria-current="page">{{ label }}</span>
+    {% else %}
+      <a class="shelf-nav-item" href="{{ path }}{% if filter_query %}?{{ filter_query }}{% endif %}">{{ label }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>

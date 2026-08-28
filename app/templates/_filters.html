@@ -1,0 +1,71 @@
+{# The filter bar (SPEC §9). One GET form per page: every control names its filter,
+   so the browser builds the query string and the link stays shareable. No
+   JavaScript required. #}
+<form class="filter-bar" method="get" action="{{ shelf_path }}">
+  <label class="filter">
+    <span class="filter-label">Search</span>
+    <input class="filter-input" name="q" value="{{ filters.q or '' }}" maxlength="120"
+           placeholder="title, author, ISBN, note">
+  </label>
+  <label class="filter">
+    <span class="filter-label">Author</span>
+    <select class="filter-input" name="author">
+      <option value="">Anyone</option>
+      {% for author in authors %}
+        <option value="{{ author.id }}" {% if filters.author_id == author.id %}selected{% endif %}>
+          {{ author.name }} ({{ author.book_count }})
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filter">
+    <span class="filter-label">Genre</span>
+    <select class="filter-input" name="genre">
+      <option value="">Any genre</option>
+      {% for genre in genres %}
+        <option value="{{ genre.notation }}" {% if filters.genre == genre.notation %}selected{% endif %}>
+          {{ genre.label }} ({{ genre.book_count }})
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filter filter-narrow">
+    <span class="filter-label">Year</span>
+    <input class="filter-input" name="year" type="number" min="1" max="2100" step="1"
+           value="{{ filters.year if filters.year is not none else '' }}" maxlength="4">
+  </label>
+  <label class="filter">
+    <span class="filter-label">Reading</span>
+    <select class="filter-input" name="reading">
+      <option value="">Any state</option>
+      {% for state in reading_states %}
+        <option value="{{ state }}" {% if filters.reading == state %}selected{% endif %}>{{ state }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="filter">
+    <span class="filter-label">Room</span>
+    <select class="filter-input" name="room">
+      <option value="">Anywhere</option>
+      <option value="none" {% if filters.no_room %}selected{% endif %}>No room set</option>
+      {% for room in rooms %}
+        <option value="{{ room.id }}" {% if filters.room_id == room.id %}selected{% endif %}>
+          {{ room.name }} ({{ room.book_count }})
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if active_shelf == "search" %}
+    {# SPEC §3: borrowed and gone join the search only through this toggle. #}
+    <label class="filter filter-check">
+      <input type="checkbox" name="all" value="1" {% if include_all %}checked{% endif %}>
+      Include borrowed and gone
+    </label>
+  {% endif %}
+  <p class="filter-actions">
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if has_filters %}<a class="btn" href="{{ shelf_path }}">Clear</a>{% endif %}
+    <a class="btn" href="/export.csv{% if filter_query %}?{{ filter_query }}{% endif %}">Export CSV</a>
+    <a class="btn" href="/export.json{% if filter_query %}?{{ filter_query }}{% endif %}">Export JSON</a>
+  </p>
+</form>

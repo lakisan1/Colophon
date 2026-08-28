@@ -1,0 +1,175 @@
+{# The book page: the whole record, read-only (SPEC §2 "Vrste podataka", the
+   detail view A6 points at). No form and no destructive action on purpose —
+   editing, photos and every mutation live behind the edit page, so this page
+   can be linked to freely from the shelf with nothing to click by accident. #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/forms.css">
+  <link rel="stylesheet" href="/static/css/shelf.css">
+{% endblock %}
+
+{% block content %}
+  <div class="form-shell">
+    <h1 class="form-title">
+      {{ book.title }}
+      {% if book.subtitle %}<span class="form-sub">{{ book.subtitle }}</span>{% endif %}
+    </h1>
+
+    <div class="card">
+      <table class="data-table">
+        <caption class="sr-only">Everything recorded about this book</caption>
+        <tbody>
+          <tr>
+            <th scope="row">Author{{ "" if book.authors and "," not in book.authors else "s" }}</th>
+            <td>{{ book.authors or "Unknown author" }}</td>
+          </tr>
+          {% if book.series_name %}
+            <tr>
+              <th scope="row">Series</th>
+              <td>{{ book.series_name }}{% if series_position %} · #{{ series_position }}{% endif %}</td>
+            </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Format</th>
+            <td>{{ format_label or "—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Publication year</th>
+            <td>{{ book.publication_year or "—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Pages</th>
+            <td>{{ book.page_count or "—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Language</th>
+            <td>{{ book.language or "—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Publisher</th>
+            <td>
+              {{ book.publisher or "—" }}
+              {% if book.edition %}<span class="form-sub">{{ book.edition }}</span>{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Room</th>
+            <td>{{ room_name or "—" }}</td>
+          </tr>
+          {% if book.primary_genre_notation %}
+            <tr>
+              <th scope="row">Genre</th>
+              <td>{{ book.primary_genre_notation }} · {{ genre_label or "unlabelled" }}</td>
+            </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Price</th>
+            {# The symbol and the thousands separator come from the server
+               (SPEC §10); the template never touches the number. #}
+            <td class="numeric">{{ price_text or "—" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Ownership</th>
+            <td>{{ book.ownership_status }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Reading state</th>
+            <td>{{ book.reading_state }}</td>
+          </tr>
+          {% if book.gifted_to %}
+            <tr>
+              <th scope="row">Gifted to</th>
+              <td>{{ book.gifted_to }}</td>
+            </tr>
+          {% endif %}
+          {% if book.where_bought %}
+            {# The "gone" story per shelf 3: a sale keeps price + where, a gift
+               keeps to whom — the schema has no sold_to column. #}
+            <tr>
+              <th scope="row">Where bought</th>
+              <td>{{ book.where_bought }}</td>
+            </tr>
+          {% endif %}
+          {% if loan %}
+            {# The open loans row only: SPEC §3 shelf 2, "to whom and since when". #}
+            <tr>
+              <th scope="row">On loan to</th>
+              <td>
+                {{ loan.borrowed_to }}, since {{ loan.loaned_at }}
+                {%- if loan.expected_return_date %} · expected back {{ loan.expected_return_date }}{% endif %}
+              </td>
+            </tr>
+          {% endif %}
+          {% if book.height_mm or book.width_mm or book.thickness_mm %}
+            <tr>
+              <th scope="row">Dimensions</th>
+              <td class="numeric">
+                {{ book.height_mm or "—" }} × {{ book.width_mm or "—" }} × {{ book.thickness_mm or "—" }} mm
+              </td>
+            </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Signed</th>
+            <td>{{ "yes" if book.is_signed else "no" }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Sprayed edges</th>
+            <td>{{ "yes" if book.is_sprayed_edge else "no" }}</td>
+          </tr>
+          {% if book.inscription %}
+            <tr>
+              <th scope="row">Inscription</th>
+              <td>{{ book.inscription }}</td>
+            </tr>
+          {% endif %}
+          {% if book.notes %}
+            <tr>
+              <th scope="row">Notes</th>
+              <td>{{ book.notes }}</td>
+            </tr>
+          {% endif %}
+          <tr>
+            <th scope="row">Added</th>
+            <td>{{ book.created_at }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Photos</h2>
+      {% if photos %}
+        <div class="photo-slots">
+          {% for slot in photos %}
+            <div class="photo-slot">
+              <h3 class="slot-title">{{ slot }}</h3>
+              {# Only slots with bytes on disk reach here, so this src always
+                 resolves — the route picks upload over provider (T6). #}
+              <img class="slot-preview" src="/book/{{ book.id }}/photos/{{ slot }}"
+                   alt="{{ slot }} photo of {{ book.title }}">
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if missing_photo_files %}
+        {# A row exists but the file does not: say it, do not show a broken icon. #}
+        <p class="hint">
+          {{ missing_photo_files }} photo slot{{ 's' if missing_photo_files != 1 else '' }} recorded
+          without a stored file.
+        </p>
+      {% endif %}
+      {% if not photos and not missing_photo_files %}
+        <p class="hint">
+          No photos of this copy yet — <a href="/book/{{ book.id }}/edit">the edit page</a> is where
+          they are added.
+        </p>
+      {% endif %}
+    </div>
+
+    <p class="form-actions">
+      <a class="btn btn-primary" href="/book/{{ book.id }}/edit">Edit</a>
+      <a class="btn" href="/">Back to the shelf</a>
+    </p>
+  </div>
+{% endblock %}

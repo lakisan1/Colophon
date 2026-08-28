@@ -1,0 +1,56 @@
+{# Shelf 2 (SPEC §3): who has it, since when, when it is due, and the note that
+   explains it. SPEC §12 — the due date is displayed and that is the whole feature;
+   there are no reminders. #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/shelf.css">
+{% endblock %}
+
+{% block content %}
+  {% include "_nav.html" %}
+
+  <div class="shelf-toolbar">
+    <h1 class="shelf-heading">
+      Borrowed
+      <span class="shelf-count">{{ book_count }}{% if book_count != 1 %} books{% else %} book{% endif %} out</span>
+    </h1>
+  </div>
+
+  {% include "_filters.html" %}
+
+  {% if not rows %}
+    <p class="shelf-empty">
+      {% if has_filters %}Nothing borrowed matches those filters. <a href="/borrowed">Clear them</a>.
+      {% else %}Nothing is out on loan.{% endif %}
+    </p>
+  {% else %}
+    <table class="data-table">
+      <caption class="sr-only">Books currently on loan</caption>
+      <thead>
+        <tr>
+          <th scope="col">Book</th>
+          <th scope="col">Author</th>
+          <th scope="col">Borrower</th>
+          <th scope="col">Loaned</th>
+          <th scope="col">Due</th>
+          <th scope="col">Note</th>
+          <th scope="col">Loans</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            <th scope="row"><a href="/book/{{ row.book_id }}/edit">{{ row.title }}</a></th>
+            <td>{{ row.author_label }}</td>
+            <td>{{ row.borrowed_to or '—' }}</td>
+            <td>{{ row.loaned_at or '—' }}</td>
+            <td>{{ row.expected_return_date or 'no date' }}</td>
+            <td>{{ row.note or '' }}</td>
+            <td class="numeric" title="Loan records kept for this book">{{ row.loan_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

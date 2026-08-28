@@ -36,8 +36,12 @@ class Settings:
 
 def load_settings() -> Settings:
     """Read every COLOPHON_* env var fresh; called at import and by alembic env.py."""
-    db_path = _project_path(os.environ.get("COLOPHON_DB_PATH", "colophon.sqlite3"))
-    upload_dir = _project_path(os.environ.get("COLOPHON_UPLOAD_DIR", "uploads"))
+    # SPEC §14 and D13 put the SQLite file and the photos under ./data, which is also
+    # the directory the Docker volume is mounted on. Defaulting them anywhere else means
+    # a container rebuild silently loses the library, so the default is a data-safety
+    # choice rather than a stylistic one.
+    db_path = _project_path(os.environ.get("COLOPHON_DB_PATH", "data/colophon.sqlite3"))
+    upload_dir = _project_path(os.environ.get("COLOPHON_UPLOAD_DIR", "data/photos"))
     return Settings(
         secret_key=os.environ.get("COLOPHON_SECRET_KEY", DEV_FALLBACK_SECRET_KEY),
         database_url=f"sqlite:///{db_path}",

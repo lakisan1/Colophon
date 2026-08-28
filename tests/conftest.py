@@ -29,13 +29,14 @@ def bypass_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 
 @pytest.fixture()
-def seeded_client(monkeypatch: pytest.MonkeyPatch, tmp_path):
-    """Signed-in client over a throwaway database holding the M2 fixture.
+def seeded_db(monkeypatch: pytest.MonkeyPatch, tmp_path) -> tuple[TestClient, Engine]:
+    """The M2 fixture database, exposed as (client, engine).
 
     Tests must not read the project's dev database: it changes with every
-    `make seed` on the laptop, and a shelf test that quietly depends on it
-    turns into a mystery failure. The app builds its engine at import, so the
-    session factory is rebound here rather than the URL.
+    `make seed` on the laptop, and a shelf test that quietly depends on it turns
+    into a mystery failure. The app builds its engine at import, so the session
+    factory is rebound here rather than the URL. The engine comes back too, so a
+    test can assert against the rows rather than only against rendered HTML.
     """
     db_path = tmp_path / "shelf.db"
     run_alembic(db_path, "head")
@@ -45,6 +46,11 @@ def seeded_client(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.setattr(db_module, "SessionLocal", factory)
     monkeypatch.setattr(settings, "dev_auth_bypass", True)
 
-    yield TestClient(create_app())
+    yield TestClient(create_app()), engine
 
     engine.dispose()
+
+
+@pytest.fixture()
+def seeded_client(seeded_db: tuple[TestClient, Engine]) -> TestClient:
+    return seeded_db[0]
