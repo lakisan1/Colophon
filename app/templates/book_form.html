@@ -66,6 +66,7 @@
     {# ---------------- the book ---------------- #}
     <form class="card" method="post"
           action="{% if book %}/book/{{ book.id }}/edit{% else %}/book/new{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% if not user %}{% endif %}
       <fieldset>
         <legend>The book</legend>
         <label class="field field-wide">
@@ -235,6 +236,7 @@
               <h3 class="slot-title">{{ slot }}</h3>
               <img class="slot-preview" src="/book/{{ book.id }}/photos/{{ slot }}" alt="">
               <form method="post" enctype="multipart/form-data" action="/book/{{ book.id }}/photos">
+                <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
                 <input type="hidden" name="slot" value="{{ slot }}">
                 <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
                 <details class="crop">
@@ -249,6 +251,7 @@
                 <button type="submit" class="btn btn-small">Upload</button>
               </form>
               <form method="post" action="/book/{{ book.id }}/photos/{{ slot }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
                 <button type="submit" class="btn btn-small btn-quiet">Remove</button>
               </form>
             </div>

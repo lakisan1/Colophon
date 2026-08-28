@@ -10,8 +10,26 @@
     {% block head %}{% endblock %}
   </head>
   <body>
+    {# D11: while the seeded password is still in use this banner shows, cannot be
+       dismissed, and links to Settings. It warns; it never blocks data entry. #}
+    {% if request is defined and request.state.colophon_default_credentials is defined and request.state.colophon_default_credentials %}
+      <p class="default-credentials" role="status">
+        You are still using the default password.
+        <a href="/settings">Change it in Settings</a>.
+      </p>
+    {% endif %}
     <header class="site-header">
       <a class="site-title" href="/">Colophon</a>
+      {% if user is defined and user %}
+        <span class="site-user">
+          {{ user.username }}
+          <a class="site-link" href="/settings">Settings</a>
+          <form class="site-logout" method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+            <button type="submit" class="site-link-btn">Sign out</button>
+          </form>
+        </span>
+      {% endif %}
     </header>
     <main class="site-main">
       {% block content %}

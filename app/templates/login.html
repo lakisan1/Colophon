@@ -1,0 +1,22 @@
+{# The only page a stranger can see (SPEC §13). #}
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="login-shell">
+    <h1 class="login-title">Colophon</h1>
+    {% if error %}<p class="login-error" role="alert">{{ error }}</p>{% endif %}
+    <form class="card login-form" method="post" action="/login">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="field">
+        <span class="label">Username</span>
+        <input name="username" autocomplete="username" maxlength="150" required autofocus>
+      </label>
+      <label class="field">
+        <span class="label">Password</span>
+        <input name="password" type="password" autocomplete="current-password" maxlength="200" required>
+      </label>
+      <p class="form-actions"><button type="submit" class="btn btn-primary">Sign in</button></p>
+    </form>
+    <p class="hint">Locked out? On the server: <code>python -m app.tools.unlock --username admin</code></p>
+  </div>
+{% endblock %}

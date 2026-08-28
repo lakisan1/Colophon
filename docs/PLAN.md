@@ -62,9 +62,21 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       `authors`, `cover_url`) as if they were columns; a partial POST could NULL the NOT NULL status columns;
       a dangling SQL comma in `_load_book`; and the cover downloader was still calling `httpx.Client` directly,
       which is how a test reached the real Open Library.
-- [ ] **M5 Auth + settings** — login/logout, bcrypt, DB sessions 30d sliding / 90d cap, rate limit (IP+user),
+- [x] **M5 Auth + settings** — login/logout, bcrypt, DB sessions 30d sliding / 90d cap, rate limit (IP+user),
       CSRF, warning-only default-credentials banner, settings page, CLI unlock.
       _Verify:_ negative tests — lockout triggers, CSRF rejection, cookie flags, session expiry math.
+      _Done 2026-08-28:_ migration `0002` (`sessions`, `login_attempts`, seeded `admin`/`admin`),
+      `app/auth.py`, `app/cookies.py`, `app/forms.py`, `app/routers/auth.py`, `app/routers/settings.py`,
+      `app/tools/unlock.py`, `login.html`, `settings.html`, non-hideable banner in `base.html`.
+      Every mutation now runs through `app.forms.read_form`, which verifies the double-submit token.
+      33 new tests, negative-first.
+      _Verified:_ `pytest -q` → 216 passed; `ruff check .` clean; `ruff format --check .` clean (56 files);
+      live server with the bypass off — anonymous `/` → 303 `/login`, wrong password → 401, right password →
+      303 `/` with an HttpOnly SameSite=Lax `colophon_session` cookie, `/` then 200 carrying the default-password
+      banner, and `POST /book/new` with no token → **403**.
+      _Bug the tests caught:_ failures were counted across both throttle keys at once, so the same attempt
+      counted twice and the account locked on the **third** try instead of the fifth. `is_locked_out` now
+      checks each key independently.
 - [ ] **M6 Shelves 2–4, search, stats, export** — borrowed / gone / wishlist, server-side filtering,
       author-across-genres filter, FTS search, dashboard, CSV + JSON export, rooms filter.
       _Verify:_ filter truth-table tests; export round-trips through a parser.

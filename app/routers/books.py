@@ -22,6 +22,7 @@ from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.duplicates import find_duplicates
 from app.formats import FORMAT_BY_KEY
+from app.forms import read_form
 from app.isbn import normalize_isbn
 from app.lookup import fetch_provider_cover
 from app.settings import settings
@@ -77,7 +78,7 @@ async def create_book(
     request: Request,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
-    form: Annotated[dict, Depends(_read_form)],
+    form: Annotated[dict, Depends(read_form)],
 ) -> HTMLResponse:
     outcome = _parse_form(form)
     if outcome.errors:
@@ -118,7 +119,7 @@ async def update_book(
     book_id: int,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
-    form: Annotated[dict, Depends(_read_form)],
+    form: Annotated[dict, Depends(read_form)],
 ) -> HTMLResponse:
     book = _load_book(session, user.id, book_id)
     if book is None:
@@ -262,11 +263,6 @@ _TEXT_FIELDS = (
     "cover_url",
 )
 _POSITIVE_INTS = ("page_count", "height_mm", "width_mm", "thickness_mm")
-
-
-async def _read_form(request: Request) -> dict:
-    """Raw form values, unvalidated. Parsing and messages live in _parse_form."""
-    return dict((await request.form()).items())
 
 
 def _parse_form(form: dict) -> FormOutcome:

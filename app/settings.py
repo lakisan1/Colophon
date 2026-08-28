@@ -31,6 +31,7 @@ class Settings:
     upload_dir: str
     dev_auth_bypass: bool
     google_books_key: str | None
+    cookie_secure: bool
 
 
 def load_settings() -> Settings:
@@ -44,6 +45,7 @@ def load_settings() -> Settings:
         dev_auth_bypass=_env_flag("COLOPHON_DEV_AUTH_BYPASS"),
         # T5 names this variable literally, without the COLOPHON_ prefix.
         google_books_key=os.environ.get("GOOGLE_BOOKS_KEY") or None,
+        cookie_secure=_env_flag("COLOPHON_COOKIE_SECURE"),
     )
 
 

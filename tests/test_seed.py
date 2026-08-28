@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.deps import _seeded_demo_user
+from app.deps_dev import dev_user
 from app.formats import FORMAT_BY_KEY
 from app.seed import SeedSummary, dimensions, seed, sort_key
 from app.seed_data import BOOKS, DEMO_USERNAME, GIFTS, LOANS, PHOTO_PROVIDERS, ROOMS
@@ -71,16 +71,14 @@ def test_seeding_twice_leaves_identical_counts(seeded: tuple[Engine, SeedSummary
     second = seed(engine)
 
     assert second.as_dict() == first.as_dict()
-    # The demo user is reused, not duplicated, and its password hash survives.
-    assert _count(engine, "SELECT count(*) FROM users") == 1
+    # The demo user is reused, not duplicated. (The migration also seeds `admin`.)
+    assert _count(engine, "SELECT count(*) FROM users WHERE username = 'demo'") == 1
     assert second.user_id == first.user_id
 
 
 def test_demo_user_exists_with_the_named_username(seeded: tuple[Engine, SeedSummary]) -> None:
     engine, _summary = seeded
-    with engine.connect() as conn:
-        username = conn.execute(text("SELECT username FROM users")).scalar_one()
-    assert username == DEMO_USERNAME
+    assert _count(engine, f"SELECT count(*) FROM users WHERE username = '{DEMO_USERNAME}'") == 1
 
 
 def test_every_ownership_status_appears(seeded: tuple[Engine, SeedSummary]) -> None:
@@ -366,13 +364,13 @@ def test_dev_bypass_signs_in_as_the_seeded_demo_account(
 ) -> None:
     """Otherwise `make dev` shows an empty shelf next to the seeded library."""
     engine, summary = seeded
-    user = _seeded_demo_user(sessionmaker(bind=engine))
+    user = dev_user(sessionmaker(bind=engine)())
     assert user is not None
     assert user.username == DEMO_USERNAME
     assert user.id == summary.user_id
 
 
-def test_dev_bypass_falls_back_on_an_unseeded_database(tmp_path: Path) -> None:
-    # SQLite creates the file on first connect, so this reaches 'no such table'.
+def test_dev_bypass_falls_back_on_an_unmigrated_database(tmp_path: Path) -> None:
+    """No tables at all: the bypass must still hand out a usable identity."""
     engine = engine_for(tmp_path / "not-migrated.db")
-    assert _seeded_demo_user(sessionmaker(bind=engine)) is None
+    assert dev_user(sessionmaker(bind=engine)()).username == "dev"

@@ -1,0 +1,77 @@
+{# Settings (M5): display preferences and the password. #}
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="form-shell">
+    <h1 class="form-title">Settings</h1>
+    {% if notice %}<ul class="notices"><li class="notice">{{ notice }}</li></ul>{% endif %}
+    {% if errors %}<ul class="errors" role="alert">{% for e in errors %}<li class="error">{{ e }}</li>{% endfor %}</ul>{% endif %}
+
+    <form class="card" method="post" action="/settings">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <fieldset>
+        <legend>Display</legend>
+        <label class="field">
+          <span class="label">Theme</span>
+          <select name="theme">
+            {% for option in ["light", "dark"] %}
+              <option value="{{ option }}" {% if prefs.theme == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Shelf zoom</span>
+          <select name="zoom_preset">
+            {% for option in zoom_presets %}
+              <option value="{{ option }}" {% if prefs.zoom_preset == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Currency symbol</span>
+          <input name="currency_symbol" value="{{ prefs.currency_symbol }}" maxlength="4">
+        </label>
+        <label class="field">
+          <span class="label">Date format</span>
+          <select name="date_format">
+            {% for option in date_formats %}
+              <option value="{{ option }}" {% if prefs.date_format == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Time format</span>
+          <select name="time_format">
+            {% for option in time_formats %}
+              <option value="{{ option }}" {% if prefs.time_format == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </fieldset>
+      <p class="form-actions"><button type="submit" class="btn btn-primary">Save settings</button></p>
+    </form>
+
+    <form class="card" method="post" action="/settings/password">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <fieldset>
+        <legend>Password</legend>
+        <label class="field">
+          <span class="label">Current password</span>
+          <input name="current_password" type="password" autocomplete="current-password" required>
+        </label>
+        <label class="field">
+          <span class="label">New password</span>
+          <input name="new_password" type="password" autocomplete="new-password" minlength="8" required>
+        </label>
+        <label class="field">
+          <span class="label">Repeat new password</span>
+          <input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required>
+        </label>
+      </fieldset>
+      <p class="hint">Changing the password signs you out everywhere.</p>
+      <p class="form-actions"><button type="submit" class="btn btn-primary">Change password</button></p>
+    </form>
+
+    <p><a class="btn" href="/">Back to the shelf</a></p>
+  </div>
+{% endblock %}

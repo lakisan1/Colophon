@@ -1,50 +1,78 @@
-# Request dependencies. current_user is the single gate every signed-in route uses;
-# M5 replaces its body with real DB-session lookups (T8). Until then a dev bypass
-# flag keeps the app usable without auth so earlier milestones stay testable.
+# Request dependencies. `current_user` is the single gate every signed-in route
+# uses: it reads the session cookie, enforces the hard cap, and slides the expiry.
+# `require_login_form` adds CSRF on top for mutations (SPEC §13).
+#
+# The dev bypass (COLOPHON_DEV_AUTH_BYPASS=1) stays for local work: it signs in as
+# the seeded demo account when the database has one. With the bypass on there is
+# no session cookie anywhere, so CSRF checks are skipped — a cross-site request
+# cannot ride a cookie the application never reads.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Annotated
 
-from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
+from fastapi import Depends, Request
+from sqlalchemy.orm import Session
 
+from app.auth import (
+    SESSION_COOKIE,
+    load_session,
+    touch_session,
+)
+from app.db import get_session
 from app.settings import settings
 
 
 class LoginRequired(Exception):
-    """No way to identify the user. The app's exception handler redirects to /login."""
+    """No valid session. The app's exception handler redirects to /login."""
+
+
+class CsrfFailed(Exception):
+    """A mutation arrived without a token that matches the one we issued."""
 
 
 @dataclass(frozen=True)
 class CurrentUser:
-    """Stand-in for the users-table row that M5 will load; id 0 means 'not a real user'."""
+    """The signed-in identity, plus the CSRF secret that came with this session."""
 
     id: int
     username: str
+    session_id: str | None = None
+    csrf_token: str | None = None
 
 
-def current_user() -> CurrentUser:
-    if not settings.dev_auth_bypass:
+def current_user(
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> CurrentUser:
+    if settings.dev_auth_bypass:
+        from app.deps_dev import dev_user
+
+        user = dev_user(session)
+        request.state.colophon_default_credentials = False
+        return user
+
+    row = load_session(session, request.cookies.get(SESSION_COOKIE))
+    if row is None:
         raise LoginRequired
-    # `make seed` puts the demo library on the demo account, so the bypass signs
-    # in as that account when it exists — otherwise `make dev` shows an empty
-    # shelf next to 210 seeded books. The synthetic user keeps the bypass
-    # working on a database that has not been seeded (or not even migrated).
-    from app.db import SessionLocal
+    touch_session(session, row)
 
-    return _seeded_demo_user(SessionLocal) or CurrentUser(id=0, username="dev")
+    # The non-hideable banner (D11) reads this; computing it here means one
+    # memoised hash comparison instead of one per template.
+    from sqlalchemy.exc import OperationalError
 
-
-def _seeded_demo_user(session_factory) -> CurrentUser | None:
-    """The seeded demo account if this database has one. Takes the factory so
-    tests can point it at a throwaway engine."""
-    from app.seed_data import DEMO_USERNAME
+    from app.auth import uses_default_credentials
 
     try:
-        with session_factory() as session:
-            row = session.execute(
-                text("SELECT id, username FROM users WHERE username = :u"), {"u": DEMO_USERNAME}
-            ).first()
-    except OperationalError:  # no users table yet
-        return None
-    return CurrentUser(id=int(row[0]), username=str(row[1])) if row else None
+        request.state.colophon_default_credentials = uses_default_credentials(
+            session, int(row["user_id"])
+        )
+    except OperationalError:
+        request.state.colophon_default_credentials = False
+
+    return CurrentUser(
+        id=int(row["user_id"]),
+        username=str(row["username"]),
+        session_id=str(row["id"]),
+        csrf_token=str(row["csrf_token"]),
+    )

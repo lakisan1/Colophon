@@ -3,6 +3,33 @@
 Every decision the assistant made without asking, newest first. Lazar's morning job is to veto entries,
 not to answer questions. Format: date, what was decided, one-line reason, what to change if vetoed.
 
+- 2026-08-28 (**M5**) — **`Secure` on the session cookie is off by default**, switched on with
+  `COLOPHON_COOKIE_SECURE=1`. SPEC §13 asks for HttpOnly (always on) but says nothing about Secure, and with it
+  on, a plain-HTTP LAN install cannot sign in at all — httpx and browsers both refuse to return a Secure cookie
+  over http, which is how this was found. TLS deployments must set it. Veto = one line in `app/settings.py`.
+- 2026-08-28 (**M5**) — **The `admin` / `admin` account is seeded by migration `0002`, not at app startup.**
+  Reason: `alembic upgrade head` must leave a database you can actually log into. The bcrypt hash (cost 12) is
+  generated at migration time. Veto = move it to a startup hook and lose that property.
+- 2026-08-28 (**M5**) — **CSRF is double-submit (HttpOnly cookie + hidden form field) and is skipped entirely
+  when `COLOPHON_DEV_AUTH_BYPASS=1`.** With the bypass there is no session cookie in the request, so a
+  cross-site form has nothing to ride. Verification lives in one place, `app/forms.read_form`, so a new
+  mutation route cannot accidentally skip it. Veto = `app/forms.py`.
+- 2026-08-28 (**M5**) — **A failed login records against both `user:<name>` and `ip:<addr>`, and lockout is
+  checked per key.** Locking the IP too is what stops password spraying, but it means a shared NAT or a
+  misconfigured proxy without `FORWARDED_ALLOW_IPS` can lock out everyone behind it (T9). The unlock CLI clears
+  every `ip:` key for exactly that reason. Veto = `identifiers_for` in `app/auth.py`.
+- 2026-08-28 (**M5**) — **A password change ends every session for that user, including the one making the
+  change.** If the reason for changing a password is a suspect cookie, old cookies must stop working. Veto =
+  `drop_sessions_for_user` call in `app/routers/settings.py`.
+- 2026-08-28 (**M5**) — **Minimum new password length is 8.** SPEC does not state one. Veto = `MIN_PASSWORD_LENGTH`.
+- 2026-08-28 (**M5**) — **Session sliding writes at most once a minute.** Otherwise every page view is a DB
+  write, and the sliding window is a day-granularity rule anyway. Veto = the one-minute guard in `touch_session`.
+- 2026-08-28 (**M5**) — **`app/routers/pages.py` was deleted.** The `/login` stub it existed for is now the real
+  auth router, and an empty module named `pages` is exactly the `utils`/`misc` smell SPEC §15 forbids.
+- 2026-08-28 (**M5**) — **Cookie flags are asserted on the raw `Set-Cookie` header, not on the client's cookie
+  jar.** `http.cookiejar` does not model `SameSite` and names its attributes differently per version, so a
+  jar-based assertion tests the library instead of our response. Veto = `_set_cookie_header` in `tests/test_auth.py`.
+
 - 2026-08-28 (**M4**) — **Open Library is reachable from this environment.** A live round-trip fetched a real
   cover. Reason this is logged: it means a test that forgets to stub the provider will pass locally and be slow
   and flaky, so every lookup test uses `httpx.MockTransport` and `app.lookup.CLIENT_FACTORY` exists for that.
