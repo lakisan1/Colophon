@@ -1,0 +1,173 @@
+/*
+ * Forms (M4): add/edit and photo upload. Tokens come from theme.css; the shelf's
+ * own styles stay in shelf.css.
+ */
+
+.form-shell {
+  max-width: 62rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-title { margin: 0 0 0.25rem; font-size: 1.3rem; }
+
+.form-sub {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 8px;
+  background: var(--paper-raised);
+}
+
+.card-title { margin: 0 0 0.5rem; font-size: 1rem; }
+
+fieldset {
+  border: 1px solid var(--wood-shelf);
+  border-radius: 6px;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+legend {
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+}
+
+.field { display: flex; flex-direction: column; gap: 0.25rem; }
+.field-wide { grid-column: 1 / -1; }
+
+.label { font-size: 0.75rem; color: var(--ink-muted); }
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 0.88rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 4px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn:hover { background: var(--paper-raised); }
+.btn-primary { background: var(--wood-shelf); border-color: var(--wood-shelf-dark); }
+.btn-small { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
+.btn-quiet { color: var(--ink-muted); }
+
+.form-actions { display: flex; gap: 0.6rem; margin: 0; }
+
+.notices,
+.errors {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.notices { background: color-mix(in srgb, var(--cloth-sand) 35%, var(--paper)); }
+.errors { background: color-mix(in srgb, var(--cloth-crimson) 22%, var(--paper)); }
+
+.hint { font-size: 0.78rem; color: var(--ink-muted); }
+
+/* ---------- lookup ---------- */
+
+.lookup-card { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
+.lookup-card .field { flex: 1 1 18rem; }
+
+.lookup-results { margin-top: -0.4rem; }
+
+.candidates {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.candidate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--wood-shelf);
+  border-radius: 6px;
+  background: var(--paper);
+}
+
+.candidate-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.candidate-authors,
+.candidate-meta { font-size: 0.76rem; color: var(--ink-muted); }
+
+/* ---------- photos ---------- */
+
+.photo-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+
+.photo-slot { display: flex; flex-direction: column; gap: 0.4rem; }
+.slot-title { margin: 0; font-size: 0.8rem; text-transform: capitalize; }
+
+.slot-preview {
+  width: 100%;
+  height: 9rem;
+  object-fit: contain;
+  background: var(--paper);
+  border: 1px dashed var(--wood-shelf-dark);
+  border-radius: 4px;
+}
+
+.crop-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+}
+
+.crop summary { cursor: pointer; }

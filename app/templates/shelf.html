@@ -16,7 +16,9 @@
     </h1>
 
     {# A2: three presets. Plain links so zoom works with JavaScript disabled. #}
-    <nav class="zoom-switch" aria-label="Zoom">
+    <div class="shelf-actions">
+      <a class="shelf-add" href="/book/new">Add a book</a>
+      <nav class="zoom-switch" aria-label="Zoom">
       {% for preset in ["S", "M", "L"] %}
         {% if preset == zoom %}
           <span class="zoom is-current" aria-current="true">{{ preset }}</span>
@@ -24,8 +26,8 @@
           <a class="zoom" href="/?zoom={{ preset }}" rel="nofollow">{{ preset }}</a>
         {% endif %}
       {% endfor %}
-    </nav>
-  </div>
+      </nav>
+    </div>
 
   {% if not sections %}
     <p class="shelf-empty">

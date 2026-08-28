@@ -1,0 +1,260 @@
+{# Add / edit one book (M4). Plain HTML form posts; every field here maps to a
+   column in `books`, and validation messages come back from the server rather
+   than from JavaScript. #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/forms.css">
+{% endblock %}
+
+{% block content %}
+  <div class="form-shell">
+    <h1 class="form-title">
+      {% if book %}Edit{% else %}Add a book{% endif %}
+      {% if book and values.get("title") %}<span class="form-sub">{{ values.get("title") }}</span>{% endif %}
+    </h1>
+
+    {% if warnings %}
+      <ul class="notices">
+        {% for notice in warnings %}<li class="notice">{{ notice }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    {% if errors %}
+      <ul class="errors" role="alert">
+        {% for error in errors %}<li class="error">{{ error }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+
+    {# ---------------- provider lookup ---------------- #}
+    <form class="card lookup-card" method="get" action="/book/new">
+      <label class="field">
+        <span class="label">Look it up</span>
+        <input type="search" name="q" value="{{ lookup.query if lookup else '' }}"
+               placeholder="ISBN, or title and author" maxlength="200">
+      </label>
+      <button type="submit" class="btn">Search Open Library</button>
+    </form>
+
+    {% if lookup %}
+      <div class="lookup-results">
+        {% if lookup.candidates %}
+          <p class="hint">{{ lookup.candidates | length }} result{{ '' if lookup.candidates | length == 1 else 's' }}.
+             “Use this” fills the form below — nothing is saved until you press Save.</p>
+          <ul class="candidates">
+            {% for candidate in lookup.candidates %}
+              <li class="candidate">
+                <div class="candidate-body">
+                  <strong>{{ candidate.title }}</strong>
+                  {% if candidate.authors %}<span class="candidate-authors">{{ candidate.authors | join(", ") }}</span>{% endif %}
+                  <span class="candidate-meta">
+                    {{ candidate.publisher or "unknown publisher" }}
+                    {%- if candidate.published_year %} · {{ candidate.published_year }}{% endif %}
+                    {%- if candidate.page_count %} · {{ candidate.page_count }} pp{% endif %}
+                    {%- if candidate.isbn %} · {{ candidate.isbn }}{% endif %}
+                    · {{ candidate.provider }}
+                  </span>
+                </div>
+                <a class="btn btn-small"
+                   href="/book/new?title={{ candidate.title | urlencode }}&authors={{ candidate.authors | join(', ') | urlencode }}&subtitle={{ (candidate.subtitle or '') | urlencode }}&publisher={{ (candidate.publisher or '') | urlencode }}&publication_year={{ candidate.published_year or '' }}&page_count={{ candidate.page_count or '' }}&isbn={{ (candidate.isbn or '') | urlencode }}&language={{ (candidate.language or '') | urlencode }}&cover_url={{ (candidate.covers[0].url if candidate.covers else '') | urlencode }}">Use this</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# ---------------- the book ---------------- #}
+    <form class="card" method="post"
+          action="{% if book %}/book/{{ book.id }}/edit{% else %}/book/new{% endif %}">
+      <fieldset>
+        <legend>The book</legend>
+        <label class="field field-wide">
+          <span class="label">Title *</span>
+          <input name="title" value="{{ values.get('title') or '' }}" maxlength="300" required>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Subtitle</span>
+          <input name="subtitle" value="{{ values.get('subtitle') or '' }}" maxlength="300">
+        </label>
+        <label class="field field-wide">
+          <span class="label">Authors</span>
+          <input name="authors" value="{{ values.get('authors') or '' }}"
+                 placeholder="Comma separated, in the order they appear on the spine">
+        </label>
+        <label class="field">
+          <span class="label">ISBN</span>
+          <input name="isbn" value="{{ values.get('isbn') or '' }}" placeholder="10 or 13 digits">
+        </label>
+        <label class="field">
+          <span class="label">Format</span>
+          <select name="format">
+            <option value="">—</option>
+            {% for key, label in formats %}
+              <option value="{{ key }}" {% if values.get("format") == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Publisher</span>
+          <input name="publisher" value="{{ values.get('publisher') or '' }}" maxlength="200">
+        </label>
+        <label class="field">
+          <span class="label">Year</span>
+          <input name="publication_year" value="{{ values.get('publication_year') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span class="label">Edition</span>
+          <input name="edition" value="{{ values.get('edition') or '' }}" maxlength="120">
+        </label>
+        <label class="field">
+          <span class="label">Pages</span>
+          <input name="page_count" value="{{ values.get('page_count') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span class="label">Language</span>
+          <input name="language" value="{{ values.get('language') or '' }}" maxlength="10">
+        </label>
+        <label class="field">
+          <span class="label">Series</span>
+          <input name="series_name" value="{{ values.get('series_name') or '' }}">
+        </label>
+        <label class="field">
+          <span class="label">Series number</span>
+          <input name="series_position" value="{{ values.get('series_position') or '' }}"
+                 placeholder="decimals allowed: 1.5">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>On the shelf</legend>
+        <label class="field">
+          <span class="label">Genre</span>
+          <select name="primary_genre_notation">
+            <option value="">—</option>
+            {% for notation, label in genres %}
+              <option value="{{ notation }}"
+                      {% if values.get("primary_genre_notation") == notation %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Genre, in your own words</span>
+          <input name="genre_free_text" value="{{ values.get('genre_free_text') or '' }}" maxlength="120">
+        </label>
+        <label class="field">
+          <span class="label">Room</span>
+          <select name="room_id">
+            <option value="">—</option>
+            {% for room_id, room_name in rooms %}
+              <option value="{{ room_id }}" {% if values.get("room_id") == room_id %}selected{% endif %}>{{ room_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Ownership</span>
+          <select name="ownership_status">
+            {% for status in ownership_statuses %}
+              <option value="{{ status }}"
+                      {% if (values.get("ownership_status") or "owned") == status %}selected{% endif %}>{{ status }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Reading</span>
+          <select name="reading_state">
+            {% for state in reading_states %}
+              <option value="{{ state }}"
+                      {% if (values.get("reading_state") or "unread") == state %}selected{% endif %}>{{ state }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Gifted to</span>
+          <input name="gifted_to" value="{{ values.get('gifted_to') or '' }}" maxlength="160">
+        </label>
+        <label class="field">
+          <span class="label">Price</span>
+          <input name="price" value="{{ values.get('price') or '' }}" inputmode="decimal">
+        </label>
+        <label class="field">
+          <span class="label">Where bought</span>
+          <input name="where_bought" value="{{ values.get('where_bought') or '' }}" maxlength="200">
+        </label>
+        <label class="check">
+          <input type="checkbox" name="is_signed" value="1" {% if values.get("is_signed") %}checked{% endif %}>
+          Signed
+        </label>
+        <label class="check">
+          <input type="checkbox" name="is_sprayed_edge" value="1"
+                 {% if values.get("is_sprayed_edge") %}checked{% endif %}>
+          Sprayed edges
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Physical size (mm) and notes</legend>
+        <label class="field">
+          <span class="label">Height</span>
+          <input name="height_mm" value="{{ values.get('height_mm') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span class="label">Width</span>
+          <input name="width_mm" value="{{ values.get('width_mm') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span class="label">Thickness</span>
+          <input name="thickness_mm" value="{{ values.get('thickness_mm') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field field-wide">
+          <span class="label">Inscription</span>
+          <textarea name="inscription" rows="2" maxlength="500">{{ values.get('inscription') or '' }}</textarea>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Notes</span>
+          <textarea name="notes" rows="3" maxlength="2000">{{ values.get('notes') or '' }}</textarea>
+        </label>
+      </fieldset>
+
+      {# Provider cover is cached only on create; a manual upload always wins (T6). #}
+      <input type="hidden" name="cover_url" value="{{ values.get('cover_url') or '' }}">
+
+      <p class="form-actions">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn" href="/">Back to the shelf</a>
+      </p>
+    </form>
+
+    {# ---------------- photos ---------------- #}
+    {% if book %}
+      <div class="card">
+        <h2 class="card-title">Photos</h2>
+        <p class="hint">Uploads replace what is in that slot. EXIF (including GPS) is stripped on save (SPEC §8).</p>
+        <div class="photo-slots">
+          {% for slot in slots %}
+            <div class="photo-slot">
+              <h3 class="slot-title">{{ slot }}</h3>
+              <img class="slot-preview" src="/book/{{ book.id }}/photos/{{ slot }}" alt="">
+              <form method="post" enctype="multipart/form-data" action="/book/{{ book.id }}/photos">
+                <input type="hidden" name="slot" value="{{ slot }}">
+                <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
+                <details class="crop">
+                  <summary class="hint">Crop (pixels from the top-left)</summary>
+                  <div class="crop-fields">
+                    <input type="number" name="crop_left" min="0" placeholder="left">
+                    <input type="number" name="crop_top" min="0" placeholder="top">
+                    <input type="number" name="crop_right" min="1" placeholder="right">
+                    <input type="number" name="crop_bottom" min="1" placeholder="bottom">
+                  </div>
+                </details>
+                <button type="submit" class="btn btn-small">Upload</button>
+              </form>
+              <form method="post" action="/book/{{ book.id }}/photos/{{ slot }}/delete">
+                <button type="submit" class="btn btn-small btn-quiet">Remove</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

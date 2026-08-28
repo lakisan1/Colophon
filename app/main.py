@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import LoginRequired
-from app.routers import healthz, pages, shelf
+from app.routers import books, healthz, pages, shelf
 from app.templating import STATIC_DIR
 
 
@@ -17,6 +17,7 @@ def create_app() -> FastAPI:
 
     app.include_router(healthz.router)
     app.include_router(shelf.router)
+    app.include_router(books.router)
     app.include_router(pages.router)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
