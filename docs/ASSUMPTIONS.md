@@ -14,10 +14,11 @@ not to answer questions. Format: date, what was decided, one-line reason, what t
 - 2026-08-28 (**M6**) — **A book page (`GET /book/{id}`) exists even though PLAN never scheduled one.**
   SPEC §(A6) refers to "the detail page", and a shelf whose spines go nowhere is not usable. Read-only;
   editing stays on `/book/{id}/edit`. Veto = delete the route and link the spines to the edit page instead.
-- 2026-08-28 (**M6**) — **Pages render only photos whose bytes exist on disk.** A `photos` row can name a
-  provider file that was never downloaded, and an `<img>` for it is a broken icon in the middle of a record;
-  the page says "recorded without a stored file" instead. Veto = `photos` / `missing_photo_files` in
-  `app/routers/books.py`.
+- 2026-08-28 (**M6**) — **Both photo surfaces render only images whose bytes exist on disk** (the record page
+  and the edit page). A `photos` row can name a provider file that was never downloaded, and an `<img>` for it
+  is a broken icon; the pages say "no stored file for this slot" instead, and `Remove` is offered only where a
+  row exists. `test_no_image_on_a_shelf_or_record_page_is_broken` fetches every `<img>` a page emits.
+  Veto = `_photo_bytes` and the `photos` context in `app/routers/books.py`.
 - 2026-08-28 (**M6**) — **Price display: symbol before the number, two decimals, comma thousands grouping**
   (`€1,234.50`), in `app/money.py`. SPEC §10 only requires a plain number with the Settings symbol, so the
   rest is a display decision; English grouping follows SPEC's English UI, and a Serbian `1.234,56` would be

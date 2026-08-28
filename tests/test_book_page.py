@@ -245,7 +245,12 @@ def test_no_image_on_a_shelf_or_record_page_is_broken(
             row[0] for row in conn.execute(text("SELECT id FROM books ORDER BY id LIMIT 12"))
         ]
 
-    for path in ["/", "/wishlist", *[f"/book/{book_id}" for book_id in book_ids]]:
+    paths = ["/", "/wishlist", "/borrowed", "/gone"]
+    paths += [f"/book/{book_id}" for book_id in book_ids]
+    # The edit page had this bug too: it printed an <img> for all three slots
+    # whether or not a file existed behind them.
+    paths += [f"/book/{book_id}/edit" for book_id in book_ids[:4]]
+    for path in paths:
         body = client.get(path).text
         for src in re.findall(r'<img[^>]+src="([^"]+)"', body):
             assert client.get(src).status_code == 200, f"{path} points at {src}, which 404s"

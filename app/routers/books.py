@@ -735,10 +735,29 @@ def _render_form(
             if raw:
                 values[name] = raw[:300]
 
+    # Which slots have a row, and which have bytes behind it. They differ: a
+    # provider download can fail after the row was written, and then an <img> for
+    # that slot is a broken icon on the page where someone is trying to fix photos.
+    photos: dict[str, dict[str, bool]] = {}
+    if book:
+        recorded = set(
+            session.execute(
+                text("SELECT slot FROM photos WHERE book_id = :book_id"), {"book_id": book["id"]}
+            ).scalars()
+        )
+        photos = {
+            slot: {
+                "recorded": slot in recorded,
+                "bytes": _photo_bytes(session, book["id"], slot) is not None,
+            }
+            for slot in SLOTS
+        }
+
     return templates.TemplateResponse(
         request,
         "book_form.html",
         {
+            "photos": photos,
             "user": user,
             "theme": "light",
             "page_title": ("Edit " + (values.get("title") or "book")) if book else "Add a book",

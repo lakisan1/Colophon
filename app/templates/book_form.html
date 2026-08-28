@@ -234,7 +234,12 @@
           {% for slot in slots %}
             <div class="photo-slot">
               <h3 class="slot-title">{{ slot }}</h3>
-              <img class="slot-preview" src="/book/{{ book.id }}/photos/{{ slot }}" alt="">
+              {% if photos[slot].bytes %}
+                <img class="slot-preview" src="/book/{{ book.id }}/photos/{{ slot }}" alt="">
+              {% elif photos[slot].recorded %}
+                {# A row without a file: say so instead of showing a broken icon. #}
+                <p class="hint">No stored file for this slot yet — uploading below replaces it.</p>
+              {% endif %}
               <form method="post" enctype="multipart/form-data" action="/book/{{ book.id }}/photos">
                 <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
                 <input type="hidden" name="slot" value="{{ slot }}">
@@ -250,10 +255,12 @@
                 </details>
                 <button type="submit" class="btn btn-small">Upload</button>
               </form>
-              <form method="post" action="/book/{{ book.id }}/photos/{{ slot }}/delete">
-                <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
-                <button type="submit" class="btn btn-small btn-quiet">Remove</button>
-              </form>
+              {% if photos[slot].recorded %}
+                <form method="post" action="/book/{{ book.id }}/photos/{{ slot }}/delete">
+                  <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+                  <button type="submit" class="btn btn-small btn-quiet">Remove</button>
+                </form>
+              {% endif %}
             </div>
           {% endfor %}
         </div>
