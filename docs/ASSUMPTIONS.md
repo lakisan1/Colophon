@@ -3,6 +3,58 @@
 Every decision the assistant made without asking, newest first. Lazar's morning job is to veto entries,
 not to answer questions. Format: date, what was decided, one-line reason, what to change if vetoed.
 
+- 2027-08-27 (M1) — **`settings` = one global row + per-user override rows in one table.** `owner_id NULL`
+  is the global row; a `CREATE UNIQUE INDEX ... ON settings (ifnull(owner_id, -1))` pins exactly one of them,
+  because SQLite treats NULLs as *distinct* inside unique indexes — the first attempt with a partial unique
+  index passed the migration but failed its test. Migration seeds the global row: `€`, `dd.mm.yyyy`, `24h`,
+  `light`, zoom `M`. Resolution: user row → global row → hardcoded default. Reason: A2 mandates per-user zoom;
+  SPEC §10 keeps the rest site-wide, but per-user overrides cost one nullable column. Veto = the index in the
+  migration plus the resolution query in M5.
+- 2027-08-27 (M1) — **Primary genre is the single FK column `books.primary_genre_notation`; `book_genres`
+  holds only extra, filter-only genres (D5).** "Exactly one primary per book" holds by construction — a second
+  primary cannot exist — so no flag column or partial index trick is needed. Veto = `book_genres.is_primary` +
+  partial unique index instead; data migration is mechanical.
+- 2027-08-27 (M1) — **`photos` = one row per book × slot (`front`/`back`/`spine`) with separate
+  `provider_filename` and `upload_filename` columns.** T6's "separate columns" taken literally: a re-lookup only
+  ever writes the provider column, display uses the upload first (`COALESCE`). Generated filenames, never blobs.
+  Veto = one row per source instead (`source` column, unique per book+slot+source).
+- 2027-08-27 (M1) — **`books.series_position` is REAL; "nulls last" (D6) is a query expression**, not a column
+  property: `ORDER BY series_position IS NULL, series_position`. Verified by test and live demo: 1.0, 1.5, 2.0,
+  NULL. Veto = change the ORDER BY in every shelf query.
+- 2027-08-27 (M1) — **Curated genre list is exactly 45 entries**: 16 second-level `FIC`, 28 top-level
+  nonfiction, plus `LOCAL/YA` (T12). Dropped top-levels (Bibles, Law, Medical, Education, Juvenile Nonfiction,
+  Transportation, …) are one code change away in `app/genres.py`; the test pins the count to 40–55. **Codes were
+  taken from the vendored file, and it does not match the DECISIONS example**: in `data/bisac.json` Women Sleuths
+  is `FIC022040` (there is no `FIC021060`), so examples in DECISIONS/SPEC are illustrative only. Veto = edit the
+  list; nothing else depends on which 45.
+- 2027-08-27 (M1) — **The migration seeds `genres` from an inline copy of the curated list; it does not import
+  `app/genres.py`.** Reason: migrations are historical records and must not change when app code changes.
+  `test_genres.py` compares the table against `app/genres.py` row for row, so drift fails loudly. Veto = a
+  runtime seed command (breaks the round-trip guarantee).
+- 2027-08-27 (M1) — **`books.isbn` stores only the normalised ISBN-13** (`CHECK length(isbn) = 13`) and is
+  deliberately **not unique** — D3 warns, never blocks. Normalisation lives in `app/isbn.py`; a 10-digit insert
+  is a bug the DB catches. Veto = drop the CHECK (not advised) or add uniqueness (blocks D3).
+- 2027-08-27 (M1) — **Author ordering: `authors.sort_key` ("Banks, Iain M.") lives on the author;
+  `book_authors.position` (1 = first-listed) orders multiple authors; D6 sorts by the position-1 author's
+  `sort_key`.** Veto = denormalise the sort key into `book_authors` (rename drift risk) or sort on another author.
+- 2027-08-27 (M1) — **Link tables `book_authors` / `book_genres` also carry `owner_id NOT NULL`**, making D10
+  mechanical — "every table except `users` and the curated `genres`" — and letting M6 filter without joining
+  through books. Veto = drop the columns and scope via `books`.
+- 2027-08-27 (M1) — **`books.format` CHECK list is hardcoded in the migration and mirrors `app/formats.py`
+  (13 keys, each with typical mm dimensions).** The test inserts one book per key so the CHECK and the enum
+  cannot drift. Veto = edit both plus rerun the test; M2's fixture picks dimensions from these.
+- 2027-08-27 (M1) — **Storage conventions:** dates are ISO-8601 TEXT (`'2027-08-27'`; timestamps
+  `strftime('%Y-%m-%dT%H:%M:%SZ','now')`, i.e. UTC); `price` is a REAL plain number (§10, no conversion);
+  booleans are INTEGER 0/1 with explicit CHECKs; deleting a user cascades, deleting a room/series nulls book
+  references, deleting a book cascades to links/loans/photos, `same_edition_as_id` nulls. Veto = targeted
+  migration tweak.
+- 2027-08-27 (M1) — **`users` is minimal** (`username` unique NOCASE, `password_hash`, `created_at`); session,
+  login-attempt and rate-limit tables are deliberately deferred to M5 where PLAN scopes them; no admin row is
+  seeded (M5 bootstraps). Veto = pull the session schema into M1.
+- 2027-08-27 (M1→M2) — **`docs/QUESTIONS.md` stays empty**: nothing blocked. Three failures happened, once each, all fixed:
+  an f-string nesting SQL quotes in the migration (SyntaxError, fixed with a `_sql_list()` helper), `IntegrityError`
+  imported from `sqlalchemy.engine` instead of `sqlalchemy.exc` (collection ImportError), and the settings
+  unique-index NULL quirk described above (found by its own test, fixed with `ifnull`).
 - 2027-08-27 (M0→M1) — **T12 was wrong about its own source and has been corrected in place.**
   `data/bisac.json` contained a 14-byte `404: Not Found` body — an earlier fetch saved the error
   text as the file. Re-downloaded from `raw.githubusercontent.com/edsu/bisac/master/bisac.json`:
