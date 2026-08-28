@@ -1,0 +1,25 @@
+{
+  "project": "Colophon",
+  "head": "2bbf922",
+  "milestone": "M3",
+  "milestone_status": "not_started",
+  "milestones_done": ["M0", "M1", "M2"],
+  "last_heartbeat": "2026-08-28T05:04:00Z",
+  "last_heartbeat_by": "orchestrator",
+  "gate": {
+    "tests": 89,
+    "ruff_check": "clean",
+    "ruff_format_check": "clean (32 files)"
+  },
+  "needs_from_lazar": [
+    "M3 end: walk docs/VISUAL-QA.md on a real browser (the shelf is the one thing that cannot be verified headless)"
+  ],
+  "decisions_lazar_may_veto": [
+    "M2 fixture ships 210 books instead of ~150",
+    "M2 fixture leaves isbn NULL everywhere (invented ISBNs would make M6 resolve the wrong cover upstream)",
+    "dev auth bypass signs in as the seeded 'demo' user instead of the synthetic 'dev' one (M5 owns auth)"
+  ],
+  "blocked": [],
+  "open_questions_file": "docs/QUESTIONS.md",
+  "next_action": "M3 shelf: scale model A1-A8, zoom presets, LOD, generated cloth spine, wooden rows with genre labels"
+}

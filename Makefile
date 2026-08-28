@@ -4,7 +4,7 @@
 VENV := .venv
 PIP := $(VENV)/bin/pip
 
-.PHONY: venv dev test lint fmt migrate seed
+.PHONY: venv dev test lint fmt migrate seed beat doctor
 
 venv:
 	python3 -m venv $(VENV)
@@ -31,3 +31,12 @@ migrate:
 # re-run against a database that already holds other data.
 seed:
 	$(VENV)/bin/python -m app.seed
+
+# Liveness heartbeat. Any agent doing work touches this; scripts/doctor.sh calls
+# the run dead when it goes stale. Cheap insurance against a silent stall.
+beat:
+	@mkdir -p .run && date -u +%Y-%m-%dT%H:%M:%SZ > .run/heartbeat
+
+# Status in one line. `make doctor CHECK=1` also runs the test suite.
+doctor:
+	@scripts/doctor.sh $(if $(CHECK),--tests,)

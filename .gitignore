@@ -6,6 +6,7 @@ __pycache__/
 *.sqlite3-shm
 instance/
 uploads/
+.run/
 backups/
 .env
 .collected/
