@@ -1,0 +1,268 @@
+/*
+ * The shelf (M3). Geometry arrives as CSS custom properties computed by
+ * app/shelf.py — this file never re-derives millimetres, it only paints.
+ * Colours come from theme.css tokens; nothing here hardcodes a hex value, so
+ * light/dark switching stays a token swap.
+ *
+ * A7 asks for a font covering Latin Extended-A (č ć ž š đ) under an OFL licence.
+ * No webfont is vendored yet, so the stack prefers the serif families that ship
+ * with that coverage on Linux/macOS/Windows. Revisit when a subset is committed.
+ */
+
+:root {
+  --shelf-font: "DejaVu Serif", "Liberation Serif", "Noto Serif", "Times New Roman", Georgia, serif;
+  --shelf-gap: 2px;
+}
+
+/* ---------- toolbar ---------- */
+
+.shelf-toolbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+  flex-wrap: wrap;
+}
+
+.shelf-heading {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.shelf-count {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.zoom-switch {
+  display: inline-flex;
+  gap: 2px;
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.zoom {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.zoom:hover { background: var(--paper-raised); }
+
+.zoom.is-current {
+  background: var(--wood-shelf-dark);
+  color: var(--paper-raised);
+}
+
+/* ---------- one genre section (D5: a row per primary genre) ---------- */
+
+.shelf-section { margin-bottom: 1.75rem; }
+
+/* A8: the label stays visible while the row scrolls sideways. */
+.shelf-section-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: inline-block;
+  margin: 0 0 0.35rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--paper-raised);
+  background: var(--wood-shelf-dark);
+  border-radius: 3px;
+}
+
+.shelf-row {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 14px;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--shelf-gap);
+  min-height: var(--row-height, 220px);
+  /* A8: horizontal scroll, no wrapping into a grid. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* The back panel the books stand against, and the board they rest on. */
+  background: linear-gradient(180deg, var(--wood-back-panel) 0%, var(--wood-back-panel) 100%);
+  box-shadow: inset 0 6px 12px var(--wood-shadow);
+  border-bottom: 8px solid var(--wood-shelf);
+  border-radius: 2px 2px 0 0;
+}
+
+.shelf-row::after {
+  /* Shadow the books cast onto the board. */
+  content: "";
+  position: absolute;
+}
+
+/* ---------- a single book ---------- */
+
+.book {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--book-width);
+  height: var(--book-height);
+  perspective: 900px;
+  cursor: pointer;
+  outline-offset: 3px;
+}
+
+.book:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.book-3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--motion-duration) var(--motion-ease);
+}
+
+/* A6: selecting a book turns it round to show the front cover. */
+.book.is-open .book-3d { transform: rotateY(180deg); }
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  border-radius: 1px 2px 2px 1px;
+}
+
+/* A5: generated cloth spine. Hue arrives from a stable hash of the author, so
+   the same author's books sit in the same cloth family. The horizontal gradient
+   is the curve of the spine; the repeating one is woven cloth. */
+.face-spine {
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0 1px,
+      rgba(0, 0, 0, 0.05) 1px 2px
+    ),
+    linear-gradient(
+      90deg,
+      hsl(var(--cloth-hue) 42% 22%) 0%,
+      hsl(var(--cloth-hue) 52% 40%) 42%,
+      hsl(var(--cloth-hue) 46% 32%) 78%,
+      hsl(var(--cloth-hue) 38% 20%) 100%
+    );
+  box-shadow: inset -1px 0 2px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  color: hsl(var(--cloth-hue) 30% 95%);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+/* Head-and-tail bands: the tape you see on a real bound spine. */
+.spine-headband {
+  width: 100%;
+  height: 3px;
+  flex: 0 0 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.55) 0 1px,
+    rgba(255, 255, 255, 0.12) 1px 3px
+  );
+}
+
+.spine-title,
+.spine-author {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--shelf-font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: calc(var(--book-height) - 34px);
+  padding: 0 1px;
+}
+
+.spine-title { font-size: clamp(8px, 0.62vw + 6px, 13px); font-weight: 600; }
+.spine-author { font-size: clamp(7px, 0.4vw + 5px, 10px); opacity: 0.85; }
+
+/* D9: series badge on the spine. */
+.series-badge {
+  flex: 0 0 auto;
+  min-width: 13px;
+  padding: 0 2px;
+  font-size: 8px;
+  line-height: 13px;
+  text-align: center;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* A4: at title-only width the author and badge do not fit; below 14px the spine
+   is a colour sliver and the tooltip carries the text. */
+.lod-title .spine-author,
+.lod-title .series-badge,
+.lod-sliver .spine-title,
+.lod-sliver .spine-author,
+.lod-sliver .series-badge {
+  display: none;
+}
+
+/* ---------- the cover face (A6) ---------- */
+
+.face-cover {
+  transform: rotateY(180deg);
+  background: linear-gradient(160deg, var(--paper-raised) 0%, var(--paper) 100%);
+  border: 1px solid var(--wood-shelf-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.cover-title {
+  font-family: var(--shelf-font);
+  font-size: clamp(8px, 0.7vw + 6px, 14px);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.cover-author { font-size: clamp(7px, 0.5vw + 5px, 11px); color: var(--ink-muted); }
+
+/* ---------- states ---------- */
+
+.shelf-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--ink-muted);
+  border: 1px dashed var(--wood-shelf-dark);
+  border-radius: 6px;
+}
+
+/* A6: the flip is motion, so it is dropped entirely when the user asks for less.
+   The cover still opens, it simply does not animate. */
+@media (prefers-reduced-motion: reduce) {
+  .book-3d { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .shelf-heading { font-size: 1.1rem; }
+  .shelf-row { padding-bottom: 10px; }
+}

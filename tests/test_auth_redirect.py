@@ -12,8 +12,11 @@ def test_anonymous_request_redirects_to_login(client: TestClient) -> None:
     assert response.headers["location"] == "/login"
 
 
-def test_dev_bypass_lets_the_placeholder_user_through(bypass_client: TestClient) -> None:
+def test_dev_bypass_gets_the_shelf_through(bypass_client: TestClient) -> None:
+    """Asserted on structure, not on a substring: "dev" once matched the
+    `width=device-width` meta tag, which proved nothing."""
     response = bypass_client.get("/", follow_redirects=False)
 
     assert response.status_code == 200
-    assert "dev" in response.text
+    assert "My library" in response.text
+    assert 'class="shelf-toolbar"' in response.text

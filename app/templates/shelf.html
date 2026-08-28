@@ -1,0 +1,82 @@
+{# The shelf (M3): one wooden row per primary genre (D5), each book drawn at its
+   real proportions via CSS custom properties set from app/shelf.py. The markup
+   carries geometry, not styling — all pixels are computed server-side so the
+   scale model is testable without a browser. #}
+{% extends "base.html" %}
+
+{% block head %}
+  <link rel="stylesheet" href="/static/css/shelf.css">
+{% endblock %}
+
+{% block content %}
+  <div class="shelf-toolbar">
+    <h1 class="shelf-heading">
+      My library
+      <span class="shelf-count">{{ book_count }}{% if book_count != 1 %} books{% else %} book{% endif %}</span>
+    </h1>
+
+    {# A2: three presets. Plain links so zoom works with JavaScript disabled. #}
+    <nav class="zoom-switch" aria-label="Zoom">
+      {% for preset in ["S", "M", "L"] %}
+        {% if preset == zoom %}
+          <span class="zoom is-current" aria-current="true">{{ preset }}</span>
+        {% else %}
+          <a class="zoom" href="/?zoom={{ preset }}" rel="nofollow">{{ preset }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+  </div>
+
+  {% if not sections %}
+    <p class="shelf-empty">
+      Nothing on the shelves yet. Books arrive in milestone M4 (add by hand or look one up).
+    </p>
+  {% endif %}
+
+  {% for section in sections %}
+    {# A8: each genre section scrolls horizontally on its own, with the label
+       pinned, because a wrapped grid would destroy the physical metaphor. #}
+    <section class="shelf-section" data-genre="{{ section.notation }}" aria-label="{{ section.label }}">
+      <h2 class="shelf-section-label">{{ section.label }}</h2>
+      <ol class="shelf-row" style="--row-height: {{ section.row_px }}px;">
+        {% for spine in section.spines %}
+          {# A4: level of detail is a class, chosen from the rendered spine width. #}
+          <li class="book lod-{{ spine.lod }}{% if spine.has_provider_cover %} has-cover{% endif %}"
+              data-book-id="{{ spine.book_id }}"
+              style="--book-height: {{ spine.height_px }}px;
+                     --book-width: {{ spine.width_px }}px;
+                     --cloth-hue: {{ spine.cloth_hue }};"
+              tabindex="0"
+              title="{{ spine.label }}"
+              aria-label="{{ spine.label }}">
+            <div class="book-3d">
+              {# A5: generated cloth spine. A real spine photo replaces this in M4
+                 via --spine-image, once there are image bytes on disk. #}
+              <div class="face face-spine">
+                <span class="spine-headband" aria-hidden="true"></span>
+                {% if spine.lod != "sliver" %}
+                  <span class="spine-title">{{ spine.title }}</span>
+                {% endif %}
+                {% if spine.lod == "full" %}
+                  <span class="spine-author">{{ spine.author_label }}</span>
+                {% endif %}
+                {# D9: series badge, only where the spine is wide enough to show it. #}
+                {% if spine.lod == "full" and spine.badge %}
+                  <span class="series-badge">{{ spine.badge }}</span>
+                {% endif %}
+              </div>
+              {# A6: the back face of the flip. Cover art lands in M4/M7; until
+                 then it is a paper card with the title, not a broken image. #}
+              <div class="face face-cover">
+                <span class="cover-title">{{ spine.title }}</span>
+                <span class="cover-author">{{ spine.author_label }}</span>
+              </div>
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  {% endfor %}
+
+  <script src="/static/js/shelf.js" defer></script>
+{% endblock %}

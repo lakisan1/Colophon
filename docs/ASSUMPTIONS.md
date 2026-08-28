@@ -3,6 +3,42 @@
 Every decision the assistant made without asking, newest first. Lazar's morning job is to veto entries,
 not to answer questions. Format: date, what was decided, one-line reason, what to change if vetoed.
 
+- 2026-08-28 (**M3**) — **Dates in this log follow the machine clock, which reads 2026-08-28.** Entries
+  above say `2027-08-27`. Reason: the clock is the only authority available at write time and the seed's
+  loan dates already follow it. Veto = rename the older entries or fix the clock; nothing in code depends
+  on either year.
+- 2026-08-28 (**M3**) — **A7 is not met yet: no OFL webfont is vendored.** The shelf uses a serif stack
+  ("DejaVu Serif", "Liberation Serif", "Noto Serif", …) chosen for Latin Extended-A coverage, so č ć ž š đ
+  render on Linux/macOS/Windows. Reason: no font file could be fetched into the repo during this run, and
+  shipping a shelf with tofu boxes is worse than shipping one on system fonts. Veto = drop a subset into
+  `app/static/fonts/` and point `--shelf-font` at it; `docs/VISUAL-QA.md` item 10 tells Lazar what to check.
+- 2026-08-28 (**M3**) — **Shelf rows grow past the zoom preset to hold the tallest book.** A1 says height
+  is strictly linear and A2 says a row is 160/220/300 px, which collide: a 300 mm folio is 375 px at L and
+  would be clipped by `overflow-y: hidden`. Chose to keep A1 strict and let `--row-height` rise to
+  `max(preset, tallest spine)`. Veto = clamp tall books instead, which breaks A1 on exactly the books the
+  fixture includes (atases, art books).
+- 2026-08-28 (**M3**) — **A3's clamp numbers: `MIN_SPINE_PX` = S 12 / M 14 / L 16, ceiling 90 px.** The
+  decision fixes the formula but not the floor per preset. Chosen so every preset yields at least two LOD
+  tiers (asserted in `test_every_zoom_produces_more_than_one_lod_tier`) instead of collapsing the whole
+  shelf into one tier. Veto = three numbers in `app/shelf.py`.
+- 2026-08-28 (**M3**) — **Section labels show the BISAC leaf, and a leaf of "General" collapses to its
+  parent.** "Fiction / Fantasy / General" as a wooden-row label is unreadable; the row reads "Fantasy".
+  Veto = one function, `app/shelf.section_label`.
+- 2026-08-28 (**M3**) — **Genre rows are ordered by `genres.sort_order`, not alphabetically.** The curated
+  list already encodes an order (fiction first); alphabetical would contradict it. Veto = the sort key in
+  `app/shelf.build_shelf`.
+- 2026-08-28 (**M3**) — **The zoom preset is persisted by a GET (`/?zoom=L`), with no CSRF token.** A2
+  demands the choice be remembered per user and M3 has no settings page. The write is scoped to the signed-in
+  reader's own view and its worst case is a cosmetic change to their shelf. M5 replaces it with a
+  CSRF-protected settings form. A `?zoom=` value that is not a preset is ignored rather than stored, so a
+  typo in a shared link cannot overwrite the choice. Veto = drop persistence until M5.
+- 2026-08-28 (**M3**) — **The M2 fixture's `isbn` comment and one test docstring said M6; the lookup
+  milestone is M4.** Corrected in code and in `STATE.json`. Reason: `docs/PLAN.md` puts Open Library lookup
+  in M4 and M6 is shelves/search/stats/export.
+- 2026-08-28 (**M3**) — **`"dev" in response.text` was a vacuous test and has been replaced.** It passed
+  only because the page contains `width=device-width`. The assertion now checks the shelf actually rendered.
+  Reason: found while wiring M3, logged because a test that passes for the wrong reason is worse than none.
+
 - 2027-08-27 (M1) — **`settings` = one global row + per-user override rows in one table.** `owner_id NULL`
   is the global row; a `CREATE UNIQUE INDEX ... ON settings (ifnull(owner_id, -1))` pins exactly one of them,
   because SQLite treats NULLs as *distinct* inside unique indexes — the first attempt with a partial unique

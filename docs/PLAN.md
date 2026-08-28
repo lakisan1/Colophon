@@ -32,9 +32,20 @@ the same task → park it in `docs/QUESTIONS.md` and move to the next independen
       everywhere: inventing codes would make M6's Open Library lookups resolve to the wrong book.
       _Verified:_ `pytest -q` → 87 passed; `ruff check .` clean; `ruff format --check .` → 32 files;
       seeding twice returns identical counts; `make seed` on the dev DB → 210 books / 222 links / 5 loans.
-- [ ] **M3 Shelf** — scale model A1–A8, zoom presets, LOD, generated cloth spine, series badge, wooden rows
+- [x] **M3 Shelf** — scale model A1–A8, zoom presets, LOD, generated cloth spine, series badge, wooden rows
       with genre section labels, flip-to-cover, light/dark theme tokens.
       _Verify:_ rendered HTML snapshot tests + `docs/VISUAL-QA.md` checklist for Lazar.
+      _Done 2026-08-28:_ `app/shelf.py` (pure mm→px model: A1 linear height, A3 clamp, A4 LOD, A5 hashed
+      cloth), `app/shelf_store.py` (one plain-SQL query), `app/prefs.py`, `app/routers/shelf.py`,
+      `app/templates/shelf.html`, `app/static/css/shelf.css`, `app/static/js/shelf.js`. 42 new tests.
+      _Verified:_ `pytest -q` → 131 passed; `ruff check .` clean; `ruff format --check .` clean; live boot
+      served `/` 200 with 181 owned spines in 37 labelled rows, `/?zoom=L` 200, `shelf.css` 200.
+      Three real bugs found by those tests and fixed: the stored zoom preset was ignored in favour of the
+      hardcoded default (A2), 300 mm folios were clipped by the fixed row height, and raw BISAC paths were
+      being printed as shelf labels. One pre-existing vacuous assertion replaced
+      (`"dev" in response.text` matched `width=device-width`).
+      _Open for Lazar:_ `docs/VISUAL-QA.md` — geometry can only be signed off by eye, and A7 (OFL font with
+      Latin Extended-A) is deliberately **not** met yet; the CSS uses a system serif stack instead.
 - [ ] **M4 Add/edit + lookup + photos** — OpenLibrary (Google Books behind optional key), candidate cover picker,
       upload + crop, EXIF strip, duplicate warning.
       _Verify:_ endpoint tests against a fixture image and a stubbed lookup.

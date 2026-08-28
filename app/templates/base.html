@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ page_title | default('Colophon', true) }}{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/theme.css">
+    {% block head %}{% endblock %}
   </head>
   <body>
     <header class="site-header">
