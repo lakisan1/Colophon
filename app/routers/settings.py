@@ -17,7 +17,7 @@ from app.auth import drop_sessions_for_user, set_password, uses_default_credenti
 from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.forms import read_form
-from app.prefs import load_prefs
+from app.page import load_prefs_into_state, page_context
 from app.shelf import ZOOM_ROW_PX
 from app.templating import templates
 
@@ -35,7 +35,7 @@ def settings_page(
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> HTMLResponse:
-    return _render(request, session, user, load_prefs(session, user.id), notice=None, errors=[])
+    return _render(request, session, user, notice=None, errors=[])
 
 
 @router.post("/settings", response_class=HTMLResponse)
@@ -64,12 +64,13 @@ async def update_settings(
         errors.append("Currency symbol must be one to four characters.")
 
     if errors:
-        return _render(
-            request, session, user, load_prefs(session, user.id), notice=None, errors=errors
-        )
+        return _render(request, session, user, notice=None, errors=errors)
 
     _upsert_prefs(session, user.id, currency, date_format, time_format, theme, zoom)
-    return _render(request, session, user, load_prefs(session, user.id), notice="Saved.", errors=[])
+    # The page must show what was just saved: the request cached its prefs before
+    # this write (in current_user), so re-read them before rendering.
+    load_prefs_into_state(request, session, user.id)
+    return _render(request, session, user, notice="Saved.", errors=[])
 
 
 @router.post("/settings/password", response_class=HTMLResponse)
@@ -95,9 +96,7 @@ async def change_password(
         errors.append("New password and confirmation do not match.")
 
     if errors:
-        return _render(
-            request, session, user, load_prefs(session, user.id), notice=None, errors=errors
-        )
+        return _render(request, session, user, notice=None, errors=errors)
 
     set_password(session, user.id, new)
     drop_sessions_for_user(session, user.id)
@@ -161,24 +160,24 @@ def _render(
     request: Request,
     session: Session,
     user: CurrentUser,
-    prefs,
     *,
     notice: str | None,
     errors: list[str],
 ) -> HTMLResponse:
+    # `prefs` itself is one of the shared keys now (app/page.py), which is what
+    # the form below binds against; the router does not hand-assemble the theme.
     return templates.TemplateResponse(
         request,
         "settings.html",
-        {
-            "user": user,
-            "theme": prefs.theme,
-            "page_title": "Colophon — Settings",
-            "prefs": prefs,
-            "notice": notice,
-            "errors": errors,
-            "zoom_presets": list(ZOOM_ROW_PX),
-            "date_formats": DATE_FORMATS,
-            "time_formats": TIME_FORMATS,
-            "default_credentials": uses_default_credentials(session, user.id),
-        },
+        page_context(
+            request,
+            user,
+            page_title="Colophon — Settings",
+            notice=notice,
+            errors=errors,
+            zoom_presets=list(ZOOM_ROW_PX),
+            date_formats=DATE_FORMATS,
+            time_formats=TIME_FORMATS,
+            default_credentials=uses_default_credentials(session, user.id),
+        ),
     )

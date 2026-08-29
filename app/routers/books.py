@@ -26,7 +26,7 @@ from app.forms import read_form
 from app.isbn import normalize_isbn
 from app.lookup import fetch_provider_cover
 from app.money import format_price
-from app.prefs import load_prefs
+from app.page import page_context, page_prefs
 from app.settings import settings
 from app.templating import templates
 from app.uploads import SLOTS, UploadError, delete_upload, read_upload, save_upload
@@ -200,27 +200,27 @@ def book_page(
     )
     photos = [slot for slot in recorded_slots if _photo_bytes(session, book_id, slot) is not None]
 
-    prefs = load_prefs(session, user.id)
+    prefs = page_prefs(request)
     fmt = FORMAT_BY_KEY.get(book["format"] or "")
     return templates.TemplateResponse(
         request,
         "book.html",
-        {
-            "user": user,
-            "theme": prefs.theme,
-            "page_title": book["title"],
-            "book": book,
-            "genre_label": genre_label,
-            "room_name": room_name,
+        page_context(
+            request,
+            user,
+            page_title=book["title"],
+            book=book,
+            genre_label=genre_label,
+            room_name=room_name,
             # An unrecognised stored key is shown verbatim rather than blanked:
             # a detail page must not hide what the record says.
-            "format_label": fmt.label if fmt else book["format"],
-            "loan": dict(loan._mapping) if loan else None,
-            "photos": photos,
-            "missing_photo_files": len(recorded_slots) - len(photos),
-            "series_position": _series_position_text(book["series_position"]),
-            "price_text": format_price(book["price"], prefs.currency_symbol or "€"),
-        },
+            format_label=fmt.label if fmt else book["format"],
+            loan=dict(loan._mapping) if loan else None,
+            photos=photos,
+            missing_photo_files=len(recorded_slots) - len(photos),
+            series_position=_series_position_text(book["series_position"]),
+            price_text=format_price(book["price"], prefs.currency_symbol or "€"),
+        ),
     )
 
 
@@ -756,23 +756,27 @@ def _render_form(
     return templates.TemplateResponse(
         request,
         "book_form.html",
-        {
-            "photos": photos,
-            "user": user,
-            "theme": "light",
-            "page_title": ("Edit " + (values.get("title") or "book")) if book else "Add a book",
-            "book": book,
-            "values": values,
-            "errors": outcome.errors if outcome else [],
-            "warnings": notices,
-            "genres": genres,
-            "rooms": rooms,
-            "formats": [(key, spec.label) for key, spec in FORMAT_BY_KEY.items()],
-            "ownership_statuses": OWNERSHIP_STATUSES,
-            "reading_states": READING_STATES,
-            "slots": SLOTS,
-            "lookup": lookup,
-        },
+        # The theme used to be hard-coded "light" here, which is how a user with
+        # dark in their settings row got a light edit page. It now travels with
+        # the rest of the shared context from app/page.py, so this router cannot
+        # drop it (or pick up a second, divergent definition of it).
+        page_context(
+            request,
+            user,
+            page_title=("Edit " + (values.get("title") or "book")) if book else "Add a book",
+            photos=photos,
+            book=book,
+            values=values,
+            errors=outcome.errors if outcome else [],
+            warnings=notices,
+            genres=genres,
+            rooms=rooms,
+            formats=[(key, spec.label) for key, spec in FORMAT_BY_KEY.items()],
+            ownership_statuses=OWNERSHIP_STATUSES,
+            reading_states=READING_STATES,
+            slots=SLOTS,
+            lookup=lookup,
+        ),
         status_code=status_code,
     )
 

@@ -27,6 +27,7 @@ from app.auth import (
 from app.cookies import clear_session_cookies, set_session_cookies
 from app.db import get_session
 from app.deps import CurrentUser, current_user
+from app.page import page_context
 from app.settings import settings
 from app.templating import templates
 
@@ -46,12 +47,9 @@ def login_form(request: Request) -> HTMLResponse:
     response = templates.TemplateResponse(
         request,
         "login.html",
-        {
-            "page_title": "Colophon — Sign in",
-            "theme": "light",
-            "error": None,
-            "csrf_token": token,
-        },
+        # No signed-in user: page_context falls back to the site defaults, so the
+        # anonymous page still gets a real theme instead of a hard-coded string.
+        page_context(request, page_title="Colophon — Sign in", error=None, csrf_token=token),
     )
     if not request.cookies.get(CSRF_COOKIE):
         response.set_cookie(
@@ -122,12 +120,12 @@ def _rejected_login(request: Request, message: str) -> HTMLResponse:
     response = templates.TemplateResponse(
         request,
         "login.html",
-        {
-            "page_title": "Colophon — Sign in",
-            "theme": "light",
-            "error": message,
-            "csrf_token": request.cookies.get(CSRF_COOKIE) or token_urlsafe(32),
-        },
+        page_context(
+            request,
+            page_title="Colophon — Sign in",
+            error=message,
+            csrf_token=request.cookies.get(CSRF_COOKIE) or token_urlsafe(32),
+        ),
         status_code=401,
     )
     return response

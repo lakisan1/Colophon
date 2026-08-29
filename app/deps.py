@@ -20,6 +20,7 @@ from app.auth import (
     touch_session,
 )
 from app.db import get_session
+from app.page import load_prefs_into_state
 from app.settings import settings
 
 
@@ -50,6 +51,9 @@ def current_user(
 
         user = dev_user(session)
         request.state.colophon_default_credentials = False
+        # The theme and zoom every page shell needs, resolved once here rather
+        # than per router. See app/page.py.
+        load_prefs_into_state(request, session, user.id)
         return user
 
     row = load_session(session, request.cookies.get(SESSION_COOKIE))
@@ -69,6 +73,8 @@ def current_user(
         )
     except OperationalError:
         request.state.colophon_default_credentials = False
+
+    load_prefs_into_state(request, session, int(row["user_id"]))
 
     return CurrentUser(
         id=int(row["user_id"]),
