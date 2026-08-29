@@ -88,6 +88,22 @@ async def create_book(
             request, session, user, outcome=outcome, book=None, lookup_query=None, status_code=400
         )
 
+    question = _oversize_question(form, outcome.values)
+    if question:
+        # Nothing has been written yet. The form comes back with the same
+        # values, the question, and the hidden confirmation that turns the
+        # next press of this very Save button into the save.
+        outcome.warnings.append(question)
+        return _render_form(
+            request,
+            session,
+            user,
+            outcome=outcome,
+            book=None,
+            lookup_query=None,
+            confirm_oversize=True,
+        )
+
     # D3: duplicates warn, they never block. Save first, then say what it looked like.
     looks_duplicated = bool(
         find_duplicates(
@@ -131,6 +147,21 @@ async def update_book(
     if outcome.errors:
         return _render_form(
             request, session, user, outcome=outcome, book=book, lookup_query=None, status_code=400
+        )
+
+    question = _oversize_question(form, outcome.values)
+    if question:
+        # The stored row is left exactly as it was until the same submit
+        # returns with confirm_oversize=1.
+        outcome.warnings.append(question)
+        return _render_form(
+            request,
+            session,
+            user,
+            outcome=outcome,
+            book=book,
+            lookup_query=None,
+            confirm_oversize=True,
         )
 
     looks_duplicated = bool(
@@ -357,6 +388,40 @@ _TEXT_FIELDS = (
     "cover_url",
 )
 _POSITIVE_INTS = ("page_count", "height_mm", "width_mm", "thickness_mm")
+
+# The first real book entered into this app was typed in at 700 mm wide: a
+# 70 mm paperback measured in centimetres but written in millimetres. SPEC §6
+# draws every spine at its true relative size, so a wrong dimension silently
+# distorts the whole shelf — which is why anything over this limit gets asked
+# about instead of being written. It is a confirmation step, never a refusal:
+# some books really are this big (boxed sets, oversized folios).
+MAX_PLAUSIBLE_MM = 500
+_DIMENSION_FIELDS = ("width_mm", "height_mm", "thickness_mm")
+
+
+def _oversize_question(form: dict, values: dict) -> str | None:
+    """One sentence asking about implausibly large dimensions, or None.
+
+    A warning, not an error: the values are valid and the second submit — the
+    one carrying confirm_oversize=1, which the re-rendered form holds in a
+    hidden field — writes them. Negative and non-numeric dimensions never get
+    here; _parse_form has already rejected those as errors, and waiving a
+    warning waives nothing for them.
+    """
+    if (form.get("confirm_oversize") or "") == "1":
+        return None
+    parts = [
+        f"{_pretty(name[: -len('_mm')])} {values[name]} mm"
+        for name in _DIMENSION_FIELDS
+        if isinstance(values.get(name), int) and values[name] > MAX_PLAUSIBLE_MM
+    ]
+    if not parts:
+        return None
+    verb = "is" if len(parts) == 1 else "are"
+    return (
+        " and ".join(parts)
+        + f" {verb} larger than a book usually is — press Save again to save it anyway."
+    )
 
 
 def _parse_form(form: dict) -> FormOutcome:
@@ -698,10 +763,16 @@ def _render_form(
     book: dict | None,
     lookup_query: str | None,
     status_code: int = 200,
+    confirm_oversize: bool = False,
 ) -> HTMLResponse:
     from app.lookup import search
 
-    values = dict(book) if book else dict(outcome.values if outcome else {})
+    values = dict(book) if book else {}
+    if outcome:
+        # On a re-render what was just typed wins over what is stored: the
+        # warning asks about "Height 900 mm", so the field must show 900 —
+        # otherwise the page confirms a value it does not display.
+        values.update(outcome.values)
     lookup = search(lookup_query) if lookup_query else None
 
     # Messages travel as query flags on the redirect, so a browser refresh does
@@ -722,6 +793,9 @@ def _render_form(
         )
     if lookup is not None and lookup.failed:
         notices.append(lookup.error or "Lookup failed.")
+    # outcome.warnings holds the oversize question; it renders in the same
+    # notices list because it reads the same way — information, not rejection.
+    warnings = [*notices, *(outcome.warnings if outcome else [])]
     genres = session.execute(
         text("SELECT notation, label FROM genres ORDER BY sort_order, label")
     ).all()
@@ -768,7 +842,12 @@ def _render_form(
             book=book,
             values=values,
             errors=outcome.errors if outcome else [],
-            warnings=notices,
+            warnings=warnings,
+            # The template turns this into the hidden field that makes the
+            # second submit the confirmation; the number is handed to the
+            # optional JS so the rule itself stays only in this module.
+            confirm_oversize=confirm_oversize,
+            max_plausible_mm=MAX_PLAUSIBLE_MM,
             genres=genres,
             rooms=rooms,
             formats=[(key, spec.label) for key, spec in FORMAT_BY_KEY.items()],

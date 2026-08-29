@@ -64,9 +64,14 @@
     {% endif %}
 
     {# ---------------- the book ---------------- #}
-    <form class="card" method="post"
+    <form class="card" method="post" data-max-plausible-mm="{{ max_plausible_mm }}"
           action="{% if book %}/book/{{ book.id }}/edit{% else %}/book/new{% endif %}">
       <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% if not user %}{% endif %}
+      {% if confirm_oversize %}
+        {# An oversize warning is showing: this turns the next press of the same
+           Save button into the confirmation, with or without JavaScript. #}
+        <input type="hidden" name="confirm_oversize" value="1">
+      {% endif %}
       <fieldset>
         <legend>The book</legend>
         <label class="field field-wide">
@@ -267,4 +272,6 @@
       </div>
     {% endif %}
   </div>
+
+  <script src="/static/js/form.js" defer></script>
 {% endblock %}
