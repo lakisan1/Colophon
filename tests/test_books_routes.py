@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import httpx
@@ -49,12 +50,88 @@ def _owner_of(client: TestClient, book_id: int) -> int:
         )
 
 
+def _last_book_id() -> int:
+    """The id of the book created most recently on this test's database.
+
+    The add-book redirect now goes to the home page (?saved=1) and no longer
+    carries the new book's id in the path, so tests read it back from the
+    database instead of parsing the Location header.
+    """
+    from app.db import SessionLocal
+
+    with SessionLocal() as session:
+        return int(
+            session.execute(text("SELECT id FROM books ORDER BY id DESC LIMIT 1")).scalar_one()
+        )
+
+
 def test_new_book_form_renders(seeded_client: TestClient) -> None:
     response = seeded_client.get("/book/new")
 
     assert response.status_code == 200
     assert 'name="title"' in response.text
     assert "Add a book" in response.text
+
+
+def _stub_isbn_lookup(monkeypatch: pytest.MonkeyPatch, payload: dict) -> None:
+    """Point lookup.CLIENT_FACTORY at a local MockTransport returning payload."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    monkeypatch.setattr(
+        lookup_module,
+        "CLIENT_FACTORY",
+        lambda **kwargs: httpx.Client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+
+
+def test_book_lookup_returns_json_for_an_isbn(
+    seeded_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_isbn_lookup(
+        monkeypatch,
+        {
+            "ISBN:9780140328721": {
+                "title": "Fantastic Mr. Fox",
+                "authors": [{"name": "Roald Dahl"}],
+                "publishers": [{"name": "Puffin"}],
+                "publish_date": "October 1, 1988",
+                "number_of_pages": 96,
+                "languages": [{"key": "/languages/eng"}],
+            }
+        },
+    )
+
+    response = seeded_client.get("/book/lookup", params={"isbn": "978-0140328721"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    data = response.json()
+    assert data["found"] is True
+    assert data["title"] == "Fantastic Mr. Fox"
+    assert data["authors"] == ["Roald Dahl"]
+    assert data["publication_year"] == 1988
+    assert data["page_count"] == 96
+    assert data["language"] == "English"
+
+
+def test_book_lookup_reports_not_found_for_an_unknown_isbn(
+    seeded_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_isbn_lookup(monkeypatch, {})
+
+    response = seeded_client.get("/book/lookup", params={"isbn": "9780000000000"})
+
+    assert response.status_code == 200
+    assert response.json() == {"found": False}
+
+
+def test_book_lookup_returns_not_found_for_an_empty_isbn(seeded_client: TestClient) -> None:
+    response = seeded_client.get("/book/lookup")
+
+    assert response.status_code == 200
+    assert response.json() == {"found": False}
 
 
 def test_creating_a_book_applies_the_defaults(seeded_client: TestClient) -> None:
@@ -67,7 +144,7 @@ def test_creating_a_book_applies_the_defaults(seeded_client: TestClient) -> None
     assert response.headers["location"].endswith("saved=1")
     assert _book_count(seeded_client) == before + 1
 
-    new_id = int(response.headers["location"].split("/")[2])
+    new_id = _last_book_id()
     from app.db import SessionLocal
 
     with SessionLocal() as session:
@@ -80,7 +157,7 @@ def test_creating_a_book_applies_the_defaults(seeded_client: TestClient) -> None
 
 
 def test_authors_are_stored_in_order(seeded_client: TestClient) -> None:
-    response = seeded_client.post(
+    seeded_client.post(
         "/book/new",
         data={
             "title": "Design Patterns: Test Edition",
@@ -88,7 +165,7 @@ def test_authors_are_stored_in_order(seeded_client: TestClient) -> None:
         },
         follow_redirects=False,
     )
-    new_id = int(response.headers["location"].split("/")[2])
+    new_id = _last_book_id()
 
     from app.db import SessionLocal
 
@@ -155,12 +232,12 @@ def test_a_book_that_is_not_here_loses_its_room(seeded_client: TestClient) -> No
     with SessionLocal() as session:
         room_id = int(session.execute(text("SELECT id FROM rooms LIMIT 1")).scalar_one())
 
-    response = seeded_client.post(
+    seeded_client.post(
         "/book/new",
         data={"title": "Sold Copy", "ownership_status": "sold", "room_id": str(room_id)},
         follow_redirects=False,
     )
-    new_id = int(response.headers["location"].split("/")[2])
+    new_id = _last_book_id()
 
     with SessionLocal() as session:
         stored_room = session.execute(
@@ -173,7 +250,8 @@ def test_edit_form_is_prefilled_and_updates(seeded_client: TestClient) -> None:
     created = seeded_client.post(
         "/book/new", data={"title": "Old Title", "page_count": "300"}, follow_redirects=False
     )
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
 
     form = seeded_client.get(f"/book/{new_id}/edit")
     assert 'value="Old Title"' in form.text
@@ -222,7 +300,8 @@ def test_photo_upload_stores_serves_and_replaces(
     seeded_client: TestClient, uploads_dir: Path
 ) -> None:
     created = seeded_client.post("/book/new", data={"title": "Photo Book"}, follow_redirects=False)
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
 
     upload = seeded_client.post(
         f"/book/{new_id}/photos",
@@ -265,7 +344,8 @@ def test_photo_upload_stores_serves_and_replaces(
 
 def test_photo_upload_rejects_a_non_image(seeded_client: TestClient, uploads_dir: Path) -> None:
     created = seeded_client.post("/book/new", data={"title": "No Photo"}, follow_redirects=False)
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
 
     response = seeded_client.post(
         f"/book/{new_id}/photos",
@@ -291,7 +371,8 @@ def test_photo_delete_removes_the_row_and_the_file(
     created = seeded_client.post(
         "/book/new", data={"title": "Temporary Art"}, follow_redirects=False
     )
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
     seeded_client.post(
         f"/book/{new_id}/photos",
         data={"slot": "spine"},
@@ -314,7 +395,8 @@ def test_photo_delete_removes_the_row_and_the_file(
 
 def test_an_unknown_slot_is_not_stored(seeded_client: TestClient, uploads_dir: Path) -> None:
     created = seeded_client.post("/book/new", data={"title": "Slotless"}, follow_redirects=False)
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
 
     response = seeded_client.post(
         f"/book/{new_id}/photos",
@@ -346,7 +428,8 @@ def test_provider_cover_is_cached_when_a_candidate_is_adopted(
         data={"title": "Adopted Cover", "cover_url": "https://covers.openlibrary.org/b/id/9-L.jpg"},
         follow_redirects=False,
     )
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
 
     from app.db import SessionLocal
 
@@ -382,7 +465,8 @@ def test_a_failing_provider_does_not_break_the_save(
     )
 
     assert created.status_code == 303
-    new_id = int(created.headers["location"].split("/")[2])
+    assert created.status_code == 303
+    new_id = _last_book_id()
     from app.db import SessionLocal
 
     with SessionLocal() as session:
@@ -458,3 +542,79 @@ def test_prefill_query_parameters_fill_the_blank_form(seeded_client: TestClient)
 
 def test_shelf_links_to_add_a_book(seeded_client: TestClient) -> None:
     assert 'href="/book/new"' in seeded_client.get("/").text
+
+
+def _created_book_id(client: TestClient, title: str = "Deletable Book") -> int:
+    """Create a book and return its id."""
+    response = client.post(
+        "/book/new",
+        data={"title": title, "page_count": "200"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    return _last_book_id()
+
+
+def _csrf(client: TestClient, page: str) -> str:
+    """Read the CSRF token out of an edit page's delete form."""
+    html = client.get(page).text
+    match = re.search(r'name="csrf_token" value="([^"]*)"', html)
+    assert match, "expected a csrf_token input on the edit page"
+    return match.group(1)
+
+
+def test_delete_book_requires_the_account_password(seeded_client: TestClient) -> None:
+    book_id = _created_book_id(seeded_client)
+    before = _book_count(seeded_client)
+
+    # A wrong password must not delete anything.
+    wrong = seeded_client.post(
+        f"/book/{book_id}/delete",
+        data={
+            "csrf_token": _csrf(seeded_client, f"/book/{book_id}/edit"),
+            "password": "not-the-demo-password",
+            "confirm_delete": "1",
+        },
+        follow_redirects=False,
+    )
+    assert wrong.status_code == 400
+    assert "Wrong password" in wrong.text
+    assert _book_count(seeded_client) == before
+
+
+def test_delete_book_requires_the_confirmation_checkbox(seeded_client: TestClient) -> None:
+    book_id = _created_book_id(seeded_client)
+    before = _book_count(seeded_client)
+
+    # Without the "Are you sure?" checkbox the book must not be deleted.
+    refused = seeded_client.post(
+        f"/book/{book_id}/delete",
+        data={
+            "csrf_token": _csrf(seeded_client, f"/book/{book_id}/edit"),
+            "password": "demo",
+            # no confirm_delete
+        },
+        follow_redirects=False,
+    )
+    assert refused.status_code == 400
+    assert "really want to delete" in refused.text
+    assert _book_count(seeded_client) == before
+
+
+def test_delete_book_with_the_account_password(seeded_client: TestClient) -> None:
+    book_id = _created_book_id(seeded_client)
+    before = _book_count(seeded_client)
+
+    # The demo account's password is "demo" (see seed data).
+    deleted = seeded_client.post(
+        f"/book/{book_id}/delete",
+        data={
+            "csrf_token": _csrf(seeded_client, f"/book/{book_id}/edit"),
+            "password": "demo",
+            "confirm_delete": "1",
+        },
+        follow_redirects=False,
+    )
+    assert deleted.status_code == 303
+    assert deleted.headers["location"] == "/"
+    assert _book_count(seeded_client) == before - 1

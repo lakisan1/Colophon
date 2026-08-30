@@ -1,0 +1,258 @@
+#!/usr/bin/env node
+/**
+ * Builds the shared app chrome (header, nav, cards, forms, banner, stats).
+ * Node.js generates the CSS + JS from these source strings.
+ * Run with:  node tools/build_shell.mjs
+ *
+ * Writes:
+ *   app/static/css/shell.css
+ *   app/static/js/shell.js
+ */
+import { writeFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, "..");
+
+const shellCss = `
+/* Shared app chrome. Uses the theme tokens from theme.css, so every page
+   tracks light/dark via the <html data-theme="..."> attribute. */
+
+/* --- layout ------------------------------------------------------------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 1.25rem;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--wood-shelf);
+}
+
+.site-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+.site-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.site-nav a {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  color: var(--ink-muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.site-nav a:hover { color: var(--ink); background: var(--paper); }
+
+.site-nav a[aria-current="page"],
+.site-nav a.active { color: var(--ink); background: var(--paper); }
+
+.site-main {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.25rem;
+}
+
+.page-head h1, .page-head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.page-head .page-count { color: var(--ink-muted); font-size: 0.9rem; }
+
+/* --- cards -------------------------------------------------------------- */
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--wood-shelf);
+  border-radius: 14px;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  margin: 0 0 0.9rem;
+  font-size: 1.1rem;
+}
+
+.card-hint {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+/* --- forms -------------------------------------------------------------- */
+.field { display: block; margin: 0 0 0.9rem; }
+.label { display: block; margin: 0 0 0.3rem; font-size: 0.82rem; color: var(--ink-muted); }
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--wood-shelf);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.input:focus-visible, .select:focus-visible, .btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.select {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--wood-shelf);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--wood-shelf);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+
+.btn:hover { filter: brightness(1.04); }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  border-color: var(--focus-ring);
+  background: var(--focus-ring);
+  color: #fff;
+}
+
+.btn-danger {
+  border-color: var(--danger, #a33);
+  background: var(--danger, #a33);
+  color: #fff;
+}
+
+/* --- banner ------------------------------------------------------------- */
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--focus-ring, #b3541e);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--focus-ring, #b3541e) 10%, var(--paper-raised));
+  color: var(--ink);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.banner button {
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* --- stats grid --------------------------------------------------------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--wood-shelf);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.stat-card dt { font-size: 0.8rem; color: var(--ink-muted); }
+.stat-card dd { margin: 0.25rem 0 0; font-size: 1.4rem; font-weight: 650; }
+
+/* --- misc --------------------------------------------------------------- */
+.stack { display: grid; gap: 1rem; }
+.row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .site-nav-toggle { display: inline-flex; }
+  .site-nav {
+    display: none;
+    width: 100%;
+    order: 3;
+    margin-left: 0;
+  }
+  .site-nav.open { display: flex; }
+  .site-header { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
+`;
+
+const shellJs = `
+/* Shared app chrome: dismissable banner and mobile nav toggle. */
+(() => {
+  const dismiss = document.querySelector("[data-banner-dismiss]");
+  if (dismiss && dismiss.closest(".banner")) {
+    dismiss.addEventListener("click", () => dismiss.closest(".banner").remove());
+  }
+
+  const toggle = document.querySelector("[data-nav-toggle]");
+  const nav = document.querySelector(".site-nav");
+  if (toggle && nav) {
+    toggle.addEventListener("click", () => {
+      const open = nav.classList.toggle("open");
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.textContent = open ? "Close" : "Menu";
+    });
+  }
+})();
+`;
+
+const targets = {
+  "app/static/css/shell.css": shellCss.trim() + "\n",
+  "app/static/js/shell.js": shellJs.trim() + "\n",
+};
+
+for (const [rel, content] of Object.entries(targets)) {
+  const out = join(root, rel);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, content);
+  console.log(`wrote ${rel}`);
+}

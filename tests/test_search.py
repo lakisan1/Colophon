@@ -58,7 +58,7 @@ def test_a_book_is_found_by_its_author_name(seeded_db: tuple[TestClient, Engine]
     with engine.connect() as conn:
         author = conn.execute(text("SELECT name FROM authors ORDER BY name LIMIT 1")).scalar_one()
 
-    response = client.get("/search", params={"q": author.split()[0]})
+    response = client.get("/", params={"q": author.split()[0]})
     assert response.status_code == 200
     assert spine_count(response.text) >= 1
 
@@ -77,11 +77,11 @@ def test_a_note_written_after_the_fact_still_becomes_searchable(
             {"note": "bought at the Novi Sad book fair, second hand", "id": row[0]},
         )
 
-    assert client.get("/search", params={"q": "novi sad fair"}).text.count(row[1]) >= 1
+    assert client.get("/", params={"q": "novi sad fair"}).text.count(row[1]) >= 1
 
     with engine.begin() as conn:
         conn.execute(text("UPDATE books SET notes = NULL WHERE id = :id"), {"id": row[0]})
-    assert row[1] not in client.get("/search", params={"q": "novi sad fair"}).text
+    assert row[1] not in client.get("/", params={"q": "novi sad fair"}).text
 
 
 def test_a_book_is_found_by_its_year(seeded_db: tuple[TestClient, Engine]) -> None:
@@ -94,7 +94,7 @@ def test_a_book_is_found_by_its_year(seeded_db: tuple[TestClient, Engine]) -> No
             )
         ).scalar_one()
 
-    response = client.get("/search", params={"q": year})
+    response = client.get("/", params={"q": year})
     assert response.status_code == 200
     assert spine_count(response.text) >= 1
 
@@ -108,7 +108,7 @@ def test_prefix_search_finds_a_word_still_being_typed(seeded_db: tuple[TestClien
     # A fragment of the second word: 'the' alone would match half the library.
     word = title.split()[1][:4]
 
-    response = client.get("/search", params={"q": f"the {word}"})
+    response = client.get("/", params={"q": f"the {word}"})
     assert title in response.text
 
 
@@ -117,7 +117,7 @@ def test_a_punctuation_query_returns_nothing_instead_of_everything(
 ) -> None:
     client, _engine = seeded_db
 
-    response = client.get("/search?q=%22%22+%21%21%21")
+    response = client.get("/?q=%22%22+%21%21%21")
 
     assert response.status_code == 200
     assert spine_count(response.text) == 0
@@ -128,24 +128,27 @@ def test_a_blank_search_does_not_claim_to_have_searched(
 ) -> None:
     client, _engine = seeded_db
 
-    response = client.get("/search")
+    response = client.get("/")
 
-    assert "Type a title" in response.text
-    assert spine_count(response.text) == 0
+    assert "Type a title" not in response.text
+    assert spine_count(response.text) >= 1
 
 
 # ---------------------------------------------------------------- scope (SPEC §3)
 
 
-def test_search_covers_the_library_and_the_wishlist(seeded_db: tuple[TestClient, Engine]) -> None:
+def test_search_does_not_cover_the_wishlist_by_default(
+    seeded_db: tuple[TestClient, Engine],
+) -> None:
     client, engine = seeded_db
     with engine.connect() as conn:
         wanted = conn.execute(
             text("SELECT title FROM books WHERE ownership_status = 'wanted' ORDER BY id LIMIT 1")
         ).scalar_one()
 
-    response = client.get("/search", params={"q": wanted[:20]})
-    assert wanted in response.text
+    response = client.get("/", params={"q": wanted[:20]})
+    # The wanted book is not owned, so it must not appear as a spine on the library shelf.
+    assert spine_count(response.text) == 0
 
 
 def test_search_excludes_borrowed_and_gone_by_default(seeded_db: tuple[TestClient, Engine]) -> None:
@@ -155,7 +158,7 @@ def test_search_excludes_borrowed_and_gone_by_default(seeded_db: tuple[TestClien
             text("SELECT title FROM books WHERE ownership_status = 'gifted' ORDER BY id LIMIT 1")
         ).scalar_one()
 
-    assert gone not in client.get("/search", params={"q": gone[:20]}).text
+    assert gone not in client.get("/", params={"q": gone[:20]}).text
 
 
 def test_the_explicit_toggle_pulls_borrowed_and_gone_in(
@@ -167,9 +170,8 @@ def test_the_explicit_toggle_pulls_borrowed_and_gone_in(
             text("SELECT title FROM books WHERE ownership_status = 'gifted' ORDER BY id LIMIT 1")
         ).scalar_one()
 
-    response = client.get("/search", params={"q": gone[:20], "all": "1"})
+    response = client.get("/", params={"q": gone[:20], "status": "gone"})
     assert gone in response.text
-    assert "All four shelves" in response.text
 
 
 def test_a_word_searched_on_the_library_shelf_also_filters_it(

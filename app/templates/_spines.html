@@ -1,10 +1,12 @@
 {# The spines themselves (M3), shared by the library, the wishlist and the search
    results so a hit renders exactly as it does on its own shelf. #}
+<div class="shelves-wall">
 {% for section in sections %}
   {# A8: each genre section scrolls horizontally on its own, with the label pinned,
      because a wrapped grid would destroy the physical metaphor. #}
   <section class="shelf-section" data-genre="{{ section.notation }}" aria-label="{{ section.label }}">
     <h2 class="shelf-section-label">{{ section.label }}</h2>
+    <div class="shelf-scroll">
     <ol class="shelf-row" style="--row-height: {{ section.row_px }}px;">
       {% for spine in section.spines %}
         {# A4: level of detail is a class, chosen from the rendered spine width. #}
@@ -33,8 +35,9 @@
                   <span class="spine-author">{{ spine.author_label }}</span>
                 {% endif %}
               </a>
-              {# D9: series badge, only where the spine is wide enough to show it. #}
-              {% if spine.lod == "full" and spine.badge %}
+              {# D9: the series number is always shown, even on a thin spine, so
+                 the reader can tell which book in a series it is. #}
+              {% if spine.badge %}
                 <span class="series-badge">{{ spine.badge }}</span>
               {% endif %}
             </div>
@@ -48,5 +51,7 @@
         </li>
       {% endfor %}
     </ol>
+    </div>
   </section>
 {% endfor %}
+</div>

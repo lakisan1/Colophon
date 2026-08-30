@@ -49,7 +49,13 @@ def login_form(request: Request) -> HTMLResponse:
         "login.html",
         # No signed-in user: page_context falls back to the site defaults, so the
         # anonymous page still gets a real theme instead of a hard-coded string.
-        page_context(request, page_title="Colophon — Sign in", error=None, csrf_token=token),
+        page_context(
+            request,
+            page_title="Colophon — Sign in",
+            error=None,
+            csrf_token=token,
+            theme="dark",
+        ),
     )
     if not request.cookies.get(CSRF_COOKIE):
         response.set_cookie(
@@ -125,6 +131,7 @@ def _rejected_login(request: Request, message: str) -> HTMLResponse:
             page_title="Colophon — Sign in",
             error=message,
             csrf_token=request.cookies.get(CSRF_COOKIE) or token_urlsafe(32),
+            theme="dark",
         ),
         status_code=401,
     )

@@ -16,13 +16,20 @@
 
 /* ---------- toolbar ---------- */
 
+/* The library header: one card that groups the title + count, the zoom preset
+   and the search/filter bar below, so they read as a single element instead of
+   pieces floating on the page. */
 .shelf-toolbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.85rem 1rem;
   margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
   flex-wrap: wrap;
+  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.55));
 }
 
 .shelf-heading {
@@ -37,6 +44,18 @@
   font-size: 0.8rem;
   font-weight: 400;
   color: var(--ink-muted);
+}
+
+/* A confirmation flash shown after saving (e.g. "Saved."). Same visual
+   language as the form notices so the home page reads like the book form. */
+.notices {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--cloth-sand) 35%, var(--paper));
 }
 
 .zoom-switch {
@@ -62,49 +81,213 @@
   color: var(--paper-raised);
 }
 
+/* The primary action: a big, filled "Add a book" button that stands out. */
+.shelf-add {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--paper-raised);
+  background: var(--wood-shelf-dark);
+  border: 1px solid var(--wood-shelf);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.shelf-add:hover {
+  background: var(--wood-shelf);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.shelf-add:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* ---------- shelf wall: one shelf per row, stacked vertically ---------- */
+
+.shelves-wall {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.75rem;
+  /* As a flex item inside .shelf-toolbar (a row flex container), allow this
+     wall to shrink to the viewport width instead of forcing the whole page
+     wider than the screen. Wide shelves then scroll inside their own row. */
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.shelves-wall > .shelf-section {
+  flex: 1 1 auto;
+  min-width: 240px;
+  margin-bottom: 0;   /* the wall's gap handles spacing */
+  /* Guard: as a flex item in the column .shelves-wall, the section must
+     stretch to the shelf width (not its overflowing max-content shelf),
+     so horizontal scrolling happens inside the section. */
+  max-width: 100%;
+}
+
 /* ---------- one genre section (D5: a row per primary genre) ---------- */
 
-.shelf-section { margin-bottom: 1.75rem; }
+.shelf-section {
+  margin-bottom: 1.75rem;
+}
 
-/* A8: the label stays visible while the row scrolls sideways. */
+/* A8: the genre title is a small plaque mounted on the shelf. It overlaps the
+   board's top edge (a negative bottom margin plus z-index) so it reads as part
+   of the shelving rather than a pill floating above it, and it sits above the
+   scrolling books, so it stays in place while the row scrolls. */
 .shelf-section-label {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  display: inline-block;
-  margin: 0 0 0.35rem;
-  padding: 0.15rem 0.6rem;
+  position: relative;
+  z-index: 3;   /* paint over the board's top edge so it looks mounted */
+  display: table;
+  margin: 0.15rem auto -0.4rem;   /* a little room above, and it overlaps the shelf board */
+  padding: 0.2rem 0.85rem;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  text-align: center;
   color: var(--paper-raised);
-  background: var(--wood-shelf-dark);
-  border-radius: 3px;
+  background:
+    linear-gradient(180deg, var(--wood-shelf) 0%, var(--wood-shelf-dark) 58%, var(--wood-shelf-dark) 100%);
+  border: 1px solid color-mix(in srgb, var(--wood-shelf-dark) 55%, black);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark theme: the genre label, the current-zoom pill, the add button and the
+   scroll chevrons all sit on the dark wood, so their text must be the light ink
+   colour — the default --paper-raised is a dark surface in dark mode and would
+   vanish against the wood. */
+[data-theme="dark"] .shelf-section-label,
+[data-theme="dark"] .zoom.is-current,
+[data-theme="dark"] .shelf-add,
+[data-theme="dark"] .shelf-scroll.can-scroll-right::after,
+[data-theme="dark"] .shelf-scroll.can-scroll-left::before {
+  color: var(--ink);
 }
 
 .shelf-row {
   list-style: none;
   margin: 0;
-  padding: 0 0 14px;
+  padding: 0 1.1rem;  /* 1.1rem = the end caps' width, so the first/last books sit flush against the shelf edges */
+  box-sizing: border-box;   /* width:100% must include the padding, or the row overflows the board by 1.8rem */
   display: flex;
-  align-items: flex-end;
+  align-items: flex-end;      /* books sit at the bottom, on the shelf board */
   gap: var(--shelf-gap);
   min-height: var(--row-height, 220px);
-  /* A8: horizontal scroll, no wrapping into a grid. */
+  /* The fixed-width, scrollable row of books. The board/end caps live on the
+     enclosing .shelf-scroll, so they stay pinned to the content edges while
+     the books scroll inside (the right edge no longer requires scrolling). */
+  width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  /* The back panel the books stand against, and the board they rest on. */
-  background: linear-gradient(180deg, var(--wood-back-panel) 0%, var(--wood-back-panel) 100%);
-  box-shadow: inset 0 6px 12px var(--wood-shadow);
-  border-bottom: 8px solid var(--wood-shelf);
-  border-radius: 2px 2px 0 0;
 }
 
-.shelf-row::after {
-  /* Shadow the books cast onto the board. */
+.shelf-scroll {
+  position: relative;
+  width: 100%;
+  /* The fixed, full-width board. The books scroll inside .shelf-row, so these
+     end caps stay pinned to the content edges instead of scrolling away. */
+  --lip-height: 14px;
+  /* Wood back panel: a faint vertical grain across the board plus a gentle
+     falloff. At the bottom sits a thicker, beveled front lip (a little lighter
+     where it meets the books, darker at the front edge) that the books rest on; we
+     have vertical space to spare, so it is taller than a typical shelf lip. */
+  padding-bottom: var(--lip-height);
+  background:
+    linear-gradient(180deg, var(--wood-shelf) 0%, var(--wood-shelf-dark) 100%) 0 100% / 100% var(--lip-height) no-repeat,
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      rgba(0, 0, 0, 0.05) 1px 2px,
+      rgba(255, 255, 255, 0.015) 2px 4px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--wood-back-panel) 88%, white) 0%,
+      var(--wood-back-panel) 14%,
+      var(--wood-back-panel) 86%,
+      color-mix(in srgb, var(--wood-back-panel) 80%, black) 100%
+    );
+  box-shadow:
+    inset 0 6px 12px var(--wood-shadow),
+    0 3px 8px var(--wood-shadow);
+  border-radius: 2px 2px 0 0;
+}
+/* Wooden end boards on the left and right sides of each shelf. */
+.shelf-scroll::before,
+.shelf-scroll::after {
   content: "";
   position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.1rem;
+  /* A beveled end board: brighter toward the outer edge where the light catches
+     it, darker toward the books, with a thin brighter inner edge so the spines
+     read as sitting behind a real wooden side panel. */
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wood-shelf-dark) 55%, black) 0%,
+      var(--wood-shelf-dark) 14%,
+      var(--wood-shelf) 42%,
+      var(--wood-shelf-dark) 80%,
+      color-mix(in srgb, var(--wood-shelf-dark) 50%, black) 100%
+    );
+  box-shadow:
+    inset 0 0 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  border-radius: 2px;
+  z-index: 2; /* shelf end caps paint above the books so spines sit behind the edge */
+}
+.shelf-scroll::before { left: 0; }
+.shelf-scroll::after { right: 0; }
+
+/* While a side of the shelf still has hidden books, replace that side's wooden
+   end cap with a fade into the board plus a chevron: "›" = more to the right,
+   "‹" = more to the left. At the scroll end the chevron goes away and the solid
+   wooden cap returns. */
+.shelf-scroll.can-scroll-right::after {
+  content: "\203A";
+  width: 2.75rem;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, var(--wood-back-panel) 78%);
+  box-shadow: none;
+  border-radius: 0 2px 2px 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0.55rem;
+  color: var(--paper-raised);
+  font-family: var(--shelf-font);
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+.shelf-scroll.can-scroll-left::before {
+  content: "\2039";
+  width: 2.75rem;
+  background: linear-gradient(90deg, var(--wood-back-panel) 22%, rgba(0, 0, 0, 0) 100%);
+  box-shadow: none;
+  border-radius: 2px 0 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 0.55rem;
+  color: var(--paper-raised);
+  font-family: var(--shelf-font);
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.9;
 }
 
 /* ---------- a single book ---------- */
@@ -117,6 +300,23 @@
   perspective: 900px;
   cursor: pointer;
   outline-offset: 3px;
+}
+/* The last book on each shelf leans ~4° toward the row (to the left),
+   pivoting on its bottom-left corner so its top-left rests against the
+   book next to it. The lean applies only when the last book has a book to
+   its left: :not(:first-child) keeps a single-book shelf from leaning the
+   lone book. The margin-left below pushes the leaning book out by
+   height * sin(4°) so its top-left just touches the neighbour's edge instead
+   of covering it (no clipping); sin(4°) = 0.0697565. */
+.shelf-row > .book:last-child:not(:first-child) {
+  position: relative;
+  transform: rotate(-4deg);
+  transform-origin: bottom left;
+  z-index: 1; /* draw above the book to its left so its top rests on it, not through it */
+  /* Height * sin(angle) is how far the lean swings the top-left left; offset the
+     same amount (minus the 2px flex gap) so the book rests on the neighbour
+     rather than clipping over it. */
+  margin-left: calc(var(--book-height) * 0.0697565 - var(--shelf-gap));
 }
 
 .book:focus-visible {
@@ -226,13 +426,12 @@
   border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-/* A4: at title-only width the author and badge do not fit; below 14px the spine
-   is a colour sliver and the tooltip carries the text. */
+/* A4: at title-only width the author does not fit, and below 14px the spine is
+   a colour sliver so the title and author give way to the tooltip. The series
+   badge stays visible at every width (D9). */
 .lod-title .spine-author,
-.lod-title .series-badge,
 .lod-sliver .spine-title,
-.lod-sliver .spine-author,
-.lod-sliver .series-badge {
+.lod-sliver .spine-author {
   display: none;
 }
 
@@ -279,7 +478,10 @@
 
 @media (max-width: 640px) {
   .shelf-heading { font-size: 1.1rem; }
-  .shelf-row { padding-bottom: 10px; }
+  .shelf-toolbar { padding: 0.75rem 0.8rem; gap: 0.7rem; }
+  .shelf-scroll { --lip-height: 10px; }
+  .shelf-scroll::before, .shelf-scroll::after { width: 0.9rem; }
+  .shelf-row { padding: 0 0.9rem; }
 }
 
 /* ---------------------------------------------------------------- M6 shelves */
@@ -317,16 +519,18 @@
 /* ---------------------------------------------------------------- M6 filters */
 /* The filter bar is a plain GET form laid out with flexbox, so it works with the  */
 /* stylesheet only and degrades to a stacked list of fields on narrow screens.     */
+/* The search/filter fields live inside the toolbar card above, so this bar is a
+   plain full-width row — the card owns the border and background. */
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.6rem 0.9rem;
-  margin: 0 0 1.25rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
-  border-radius: 6px;
-  background: var(--surface-raised, rgba(255, 255, 255, 0.55));
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .filter {
@@ -373,7 +577,10 @@
   margin: 0;
 }
 
-.search-scope {
+.advanced-search {  margin: 0.6rem 0 0;  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));  border-radius: 6px;  padding: 0.35rem 0.6rem;}.advanced-search summary {  cursor: pointer;  font-weight: 600;  color: var(--ink-dim, #5a5045);  padding: 0.2rem 0;  user-select: none;
+  list-style: none; /* hide the native disclosure marker in Firefox */
+}.advanced-search summary::-webkit-details-marker { display: none; }.advanced-search summary::before { content: "\25B8 "; }.advanced-search[open] summary::before { content: "\25BE "; }.advanced-search-body {  display: flex;  flex-wrap: wrap;  gap: 0.6rem 0.9rem;  align-items: flex-end;  margin-top: 0.5rem;}.search-scope {
+  flex: 1 1 100%;
   margin: 0.2rem 0 0;
   font-size: 0.82rem;
   color: var(--ink-dim, #5a5045);

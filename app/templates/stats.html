@@ -7,7 +7,6 @@
 {% endblock %}
 
 {% block content %}
-  {% include "_nav.html" %}
 
   <h1 class="shelf-heading">Statistics</h1>
 
@@ -43,5 +42,8 @@
     <div class="stat"><dt>Authors</dt><dd>{{ stats.authors }}</dd></div>
     <div class="stat"><dt>Series</dt><dd>{{ stats.series }}</dd></div>
     <div class="stat"><dt>Currently out</dt><dd>{{ stats.loans_out }}</dd></div>
+    {% if stats.value %}
+      <div class="stat"><dt>Total value</dt><dd>{{ value_text }}</dd></div>
+    {% endif %}
   </dl>
 {% endblock %}

@@ -1,6 +1,10 @@
 {# Settings (M5): display preferences and the password. #}
 {% extends "base.html" %}
 
+{% block head %}
+  <link rel="stylesheet" href="/static/css/forms.css">
+{% endblock %}
+
 {% block content %}
   <div class="form-shell">
     <h1 class="form-title">Settings</h1>
@@ -13,7 +17,7 @@
         <legend>Display</legend>
         <label class="field">
           <span class="label">Theme</span>
-          <select name="theme">
+          <select class="searchable" name="theme">
             {% for option in ["light", "dark"] %}
               <option value="{{ option }}" {% if prefs.theme == option %}selected{% endif %}>{{ option }}</option>
             {% endfor %}
@@ -21,7 +25,7 @@
         </label>
         <label class="field">
           <span class="label">Shelf zoom</span>
-          <select name="zoom_preset">
+          <select class="searchable" name="zoom_preset">
             {% for option in zoom_presets %}
               <option value="{{ option }}" {% if prefs.zoom_preset == option %}selected{% endif %}>{{ option }}</option>
             {% endfor %}
@@ -33,7 +37,7 @@
         </label>
         <label class="field">
           <span class="label">Date format</span>
-          <select name="date_format">
+          <select class="searchable" name="date_format">
             {% for option in date_formats %}
               <option value="{{ option }}" {% if prefs.date_format == option %}selected{% endif %}>{{ option }}</option>
             {% endfor %}
@@ -41,7 +45,7 @@
         </label>
         <label class="field">
           <span class="label">Time format</span>
-          <select name="time_format">
+          <select class="searchable" name="time_format">
             {% for option in time_formats %}
               <option value="{{ option }}" {% if prefs.time_format == option %}selected{% endif %}>{{ option }}</option>
             {% endfor %}
@@ -72,6 +76,56 @@
       <p class="form-actions"><button type="submit" class="btn btn-primary">Change password</button></p>
     </form>
 
-    <p><a class="btn" href="/">Back to the shelf</a></p>
+    {% if user.is_admin %}
+    <form class="card" method="post" action="/settings/users/new">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <fieldset>
+        <legend>Create a user (admin)</legend>
+        <label class="field">
+          <span class="label">Username</span>
+          <input name="username" value="{{ admin_username or '' }}" required>
+        </label>
+        <label class="field">
+          <span class="label">Password</span>
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+        </label>
+        <label class="field">
+          <span class="label">Repeat password</span>
+          <input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required>
+        </label>
+      </fieldset>
+      <p class="form-actions"><button type="submit" class="btn btn-primary">Create user</button></p>
+    </form>
+
+    <div class="card">
+      <h2 class="card-title">Users</h2>
+      <ul class="user-list">
+        {% for u in users %}
+          <li class="user-row">
+            <span class="user-name">{{ u.username }}{% if u.is_admin %} (admin){% endif %}{% if u.id == user.id %} (you){% endif %}</span>
+            {% if not u.is_admin and u.id != user.id %}
+              <form class="user-delete" method="post" action="/settings/users/{{ u.id }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+                <label class="check">
+                  <input type="checkbox" name="confirm_delete" value="1" required>
+                  Are you sure? This permanently deletes {{ u.username }} and all their data — books, photos, rooms, series and sessions. It cannot be undone.
+                </label>
+                <label class="field">
+                  <span class="label">Your password to confirm</span>
+                  <input name="current_password" type="password" autocomplete="current-password" required>
+                </label>
+                <button type="submit" class="btn btn-danger">Delete user</button>
+              </form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <p class="form-actions"><button type="submit" class="btn">Sign out</button></p>
+    </form>
   </div>
 {% endblock %}

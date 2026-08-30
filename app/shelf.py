@@ -16,15 +16,26 @@ from typing import Any
 # A1: 240 mm is the reference book height; a shelf row is this many pixels tall.
 REFERENCE_HEIGHT_MM = 240.0
 
+# A1: a book taller than the preset defines the whole row's height. Leave a
+# little air above such a book so its top does not sit flush on the back panel.
+TALL_BOOK_MARGIN_PX = 10.0
+
 # A2: zoom presets are shelf-row heights in pixels. Proportions are exactly true
 # at L; S and M gain their width from the clamp instead.
-ZOOM_ROW_PX: dict[str, float] = {"S": 160.0, "M": 220.0, "L": 300.0}
+# A2: zoom presets are shelf-row heights in pixels. Proportions are exactly
+# true at L. S and M step up to the old M and L presets; L is larger still.
+ZOOM_ROW_PX: dict[str, float] = {"S": 220.0, "M": 300.0, "L": 400.0}
 DEFAULT_ZOOM = "M"
 
-# A3: floor per zoom (so thin spines stay clickable) and a ceiling (so a 160 mm
-# boxed set cannot eat a whole row).
+# A3: floor per zoom (so thin spines stay clickable) and a ceiling that scales
+# with zoom (so a boxed set cannot eat a whole row, yet still grows when you
+# zoom in). MAX_SPINE_MM is the widest a spine may be, in millimetres; it is
+# scaled to pixels by max_spine_px().
 MIN_SPINE_PX: dict[str, float] = {"S": 12.0, "M": 14.0, "L": 16.0}
-MAX_SPINE_PX = 90.0
+MAX_SPINE_MM = 72.0
+# A3: the thinnest a spine is ever treated as. Keeps a short novella from
+# becoming a hairline sliver that cannot carry its series badge.
+MIN_THICKNESS_MM = 5.0
 
 # A4: level of detail thresholds, measured in spine pixels.
 LOD_FULL_PX = 26.0
@@ -94,6 +105,16 @@ def scale_for(zoom: str) -> float:
     return ZOOM_ROW_PX[normalise_zoom(zoom)] / REFERENCE_HEIGHT_MM
 
 
+def max_spine_px(zoom: str) -> float:
+    """The widest a spine may be at this zoom, in pixels.
+
+    It scales with the zoom (like every other book) so a very thick boxed set
+    whose width is clamped still changes size when the shelf is zoomed in — the
+    old fixed 90 px ceiling left such a spine frozen at 90 px at every preset.
+    """
+    return round(MAX_SPINE_MM * scale_for(zoom), 2)
+
+
 def height_px(height_mm: int | None, zoom: str) -> float:
     """Shelf height for a book. A missing measurement renders at the reference."""
     if not height_mm or height_mm <= 0:
@@ -105,8 +126,12 @@ def spine_px(thickness_mm: int | None, zoom: str) -> float:
     """Clamped spine width in pixels (A3)."""
     if not thickness_mm or thickness_mm <= 0:
         thickness_mm = 20
+    elif thickness_mm < MIN_THICKNESS_MM:
+        # A3: no spine is thinner than 5 mm, so a novella keeps a visible spine
+        # and the geometry that goes with it.
+        thickness_mm = MIN_THICKNESS_MM
     raw = thickness_mm * scale_for(zoom)
-    return round(min(max(raw, MIN_SPINE_PX[normalise_zoom(zoom)]), MAX_SPINE_PX), 2)
+    return round(min(max(raw, MIN_SPINE_PX[normalise_zoom(zoom)]), max_spine_px(zoom)), 2)
 
 
 def level_of_detail(width_px: float) -> str:
@@ -166,22 +191,29 @@ def build_shelf(rows: list[dict[str, Any]], zoom: str) -> list[ShelfSection]:
             height_px=height_px(row["height_mm"], zoom),
             width_px=width,
             lod=level_of_detail(width),
-            cloth_hue=cloth_hue(row["author_sort_key"]),
+            cloth_hue=(
+                row["cloth_hue"]
+                if row.get("cloth_hue") is not None
+                else cloth_hue(row["author_sort_key"])
+            ),
         )
         key = spine.primary_genre_notation or "??"
         sections.setdefault(
             key, ShelfSection(key, section_label(spine.genre_label), int(row["genre_sort_order"]))
         ).spines.append(spine)
 
-    # Curated shelf order (genres.sort_order), not alphabetical: fiction first is
-    # a decision recorded in the curated list, not an accident of spelling.
-    ordered = sorted(sections.values(), key=lambda s: (s.sort_order, s.label.lower()))
+    # Shelves are shown alphabetically from A in the first row (case-insensitive
+    # on the shelf label), not in curated genre order.
+    ordered = sorted(sections.values(), key=lambda s: s.label.casefold())
     floor = ZOOM_ROW_PX[normalise_zoom(zoom)]
     for section in ordered:
         section.spines = order_spines(section.spines)
         # A 300 mm folio at zoom L is 375 px tall (A1 is strict), so the row has
-        # to grow past the preset or the tallest book on it gets clipped.
-        section.row_px = max([floor] + [spine.height_px for spine in section.spines])
+        # to grow past the preset or the tallest book on it gets clipped. A book
+        # that defines the whole shelf height also earns a little air above it,
+        # so its top does not sit flush on the back-panel edge.
+        tallest = max((sp.height_px for sp in section.spines), default=0.0)
+        section.row_px = floor if tallest <= floor else tallest + TALL_BOOK_MARGIN_PX
     return ordered
 
 

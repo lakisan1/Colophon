@@ -44,4 +44,33 @@
       book.classList.remove("is-open");
     }
   });
+
+  // Show a fade + chevron on whichever side of a shelf still has hidden books.
+  // At the scroll ends the chevron disappears and the solid wooden cap returns,
+  // so you can see that you have reached the start/end of the shelf.
+  function updateShelfIndicators() {
+    var scrolls = document.querySelectorAll(".shelf-scroll");
+    for (var i = 0; i < scrolls.length; i++) {
+      var row = scrolls[i].querySelector(".shelf-row");
+      if (!row) continue;
+      var maxScroll = row.scrollWidth - row.clientWidth;
+      // 1px tolerance for sub-pixel edge rounding.
+      scrolls[i].classList.toggle("can-scroll-left", row.scrollLeft > 1);
+      scrolls[i].classList.toggle("can-scroll-right", row.scrollLeft < maxScroll - 1);
+    }
+  }
+  function initShelfIndicators() {
+    updateShelfIndicators();
+    var scrolls = document.querySelectorAll(".shelf-scroll");
+    for (var i = 0; i < scrolls.length; i++) {
+      var row = scrolls[i].querySelector(".shelf-row");
+      if (row && !row.dataset.indicatorBound) {
+        row.dataset.indicatorBound = "1";
+        row.addEventListener("scroll", updateShelfIndicators);
+      }
+    }
+  }
+  initShelfIndicators();
+  window.addEventListener("load", initShelfIndicators);
+  window.addEventListener("resize", initShelfIndicators);
 })();

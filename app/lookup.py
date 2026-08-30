@@ -209,9 +209,14 @@ def _first_int(values) -> int | None:
 
 
 def _year_from_date(raw) -> int | None:
+    # Publish dates look like "1988", "October 1, 1988", "2000-05-01" — the
+    # year is the first 4-digit token, not necessarily the first number.
     text = str(raw or "")
     digits = "".join(character if character.isdigit() else " " for character in text).split()
-    return int(digits[0]) if digits and len(digits[0]) == 4 else None
+    for token in digits:
+        if len(token) == 4:
+            return int(token)
+    return None
 
 
 def _first_language(values) -> str | None:
@@ -240,3 +245,97 @@ def fetch_provider_cover(url: str, *, timeout: float = DEFAULT_TIMEOUT) -> bytes
     except httpx.HTTPError:
         return None
     return content if content else None
+
+
+# Open Library language keys -> readable names, used by the ISBN lookup.
+_OL_LANGUAGE = {
+    "/languages/eng": "English",
+    "/languages/fre": "French",
+    "/languages/ger": "German",
+    "/languages/spa": "Spanish",
+    "/languages/ita": "Italian",
+    "/languages/por": "Portuguese",
+    "/languages/dut": "Dutch",
+    "/languages/rus": "Russian",
+    "/languages/pol": "Polish",
+    "/languages/tur": "Turkish",
+    "/languages/ara": "Arabic",
+    "/languages/heb": "Hebrew",
+    "/languages/hin": "Hindi",
+    "/languages/jpn": "Japanese",
+    "/languages/chi": "Chinese",
+    "/languages/kor": "Korean",
+    "/languages/swe": "Swedish",
+    "/languages/nor": "Norwegian",
+    "/languages/dan": "Danish",
+    "/languages/fin": "Finnish",
+    "/languages/cze": "Czech",
+    "/languages/slo": "Slovak",
+    "/languages/hun": "Hungarian",
+    "/languages/gre": "Greek",
+    "/languages/lat": "Latin",
+}
+
+
+def _ol_language_name(languages) -> str | None:
+    """Map an Open Library language list to a readable language name."""
+    for language in languages or []:
+        if isinstance(language, dict):
+            key = language.get("key") or language.get("name") or ""
+        elif isinstance(language, str):
+            key = language
+        else:
+            key = ""
+        name = _OL_LANGUAGE.get(key) or key.rsplit("/", 1)[-1]
+        if name:
+            return name
+    return None
+
+
+def isbn_lookup(isbn: str) -> Candidate | None:
+    """Look up a single ISBN on Open Library's free, no-key ISBN API.
+
+    GET https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&jscmd=data&format=json
+    returns exact edition metadata: title, authors, publishers, publish date,
+    page count and languages.
+    """
+    normalized = normalize_isbn(isbn)
+    if not normalized:
+        return None
+    bibkey = f"ISBN:{normalized}"
+    url = "https://openlibrary.org/api/books"
+    params = {"bibkeys": bibkey, "jscmd": "data", "format": "json"}
+    try:
+        with CLIENT_FACTORY(timeout=DEFAULT_TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
+            response = client.get(url, params=params)
+            if response.status_code != 200:
+                return None
+            payload = response.json()
+    except Exception:
+        return None
+
+    record = payload.get(bibkey) or {}
+    title = record.get("title") or ""
+    if not title:
+        return None
+
+    authors = tuple((a.get("name") or "").strip() for a in (record.get("authors") or []))
+    publisher = (
+        ", ".join((p.get("name") or "").strip() for p in (record.get("publishers") or [])) or None
+    )
+    published_year = _year_from_date(record.get("publish_date") or "")
+    page_count = _first_int([record.get("number_of_pages")])
+    language = _ol_language_name(record.get("languages") or [])
+    return Candidate(
+        provider="openlibrary",
+        provider_key=bibkey,
+        title=title,
+        subtitle=None,
+        authors=authors,
+        publisher=publisher,
+        published_year=published_year,
+        page_count=page_count,
+        isbn=normalized,
+        language=language,
+        covers=(),
+    )

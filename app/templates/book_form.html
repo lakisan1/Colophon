@@ -84,8 +84,23 @@
         </label>
         <label class="field field-wide">
           <span class="label">Authors</span>
-          <input name="authors" value="{{ values.get('authors') or '' }}"
+          <input name="authors" value="{{ values.get('authors') or '' }}" list="author-options"
                  placeholder="Comma separated, in the order they appear on the spine">
+          <datalist id="author-options">
+            {% for name in author_names|default([]) %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+          </datalist>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Illustrator</span>
+          <input name="illustrator" value="{{ values.get('illustrator') or '' }}" list="illustrator-options"
+                 placeholder="Who drew it — for manga and comics">
+          <datalist id="illustrator-options">
+            {% for name in illustrator_names|default([]) %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+          </datalist>
         </label>
         <label class="field">
           <span class="label">ISBN</span>
@@ -93,7 +108,7 @@
         </label>
         <label class="field">
           <span class="label">Format</span>
-          <select name="format">
+          <select class="searchable" name="format">
             <option value="">—</option>
             {% for key, label in formats %}
               <option value="{{ key }}" {% if values.get("format") == key %}selected{% endif %}>{{ label }}</option>
@@ -109,10 +124,6 @@
           <input name="publication_year" value="{{ values.get('publication_year') or '' }}" inputmode="numeric">
         </label>
         <label class="field">
-          <span class="label">Edition</span>
-          <input name="edition" value="{{ values.get('edition') or '' }}" maxlength="120">
-        </label>
-        <label class="field">
           <span class="label">Pages</span>
           <input name="page_count" value="{{ values.get('page_count') or '' }}" inputmode="numeric">
         </label>
@@ -122,20 +133,70 @@
         </label>
         <label class="field">
           <span class="label">Series</span>
-          <input name="series_name" value="{{ values.get('series_name') or '' }}">
+          <input name="series_name" value="{{ values.get('series_name') or '' }}" list="series-options"
+                 placeholder="Pick a series, or type a new one">
+          <datalist id="series-options">
+            {% for name in series_names|default([]) %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+          </datalist>
         </label>
         <label class="field">
           <span class="label">Series number</span>
           <input name="series_position" value="{{ values.get('series_position') or '' }}"
                  placeholder="decimals allowed: 1.5">
         </label>
+
+        {# Less-common cataloguing fields live behind an Advanced disclosure so the
+           everyday fields stay clean. #}
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <div class="advanced-body">
+            <label class="field field-wide">
+              <span class="label">Translator</span>
+              <input name="translator" value="{{ values.get('translator') or '' }}" list="translator-options"
+                     placeholder="Who translated it — for translated works">
+              <datalist id="translator-options">
+                {% for name in translator_names|default([]) %}
+                  <option value="{{ name }}"></option>
+                {% endfor %}
+              </datalist>
+            </label>
+            <label class="field field-wide">
+              <span class="label">Editor</span>
+              <input name="editor" value="{{ values.get('editor') or '' }}" list="editor-options"
+                     placeholder="Who edited it — for anthologies and collections">
+              <datalist id="editor-options">
+                {% for name in editor_names|default([]) %}
+                  <option value="{{ name }}"></option>
+                {% endfor %}
+              </datalist>
+            </label>
+            <label class="field">
+              <span class="label">Edition</span>
+              <input name="edition" value="{{ values.get('edition') or '' }}" maxlength="120">
+            </label>
+            <label class="field">
+              <span class="label">Print year</span>
+              <input name="print_year" value="{{ values.get('print_year') or '' }}" inputmode="numeric">
+            </label>
+            <label class="field">
+              <span class="label">Original title</span>
+              <input name="original_title" value="{{ values.get('original_title') or '' }}" maxlength="300">
+            </label>
+            <label class="field">
+              <span class="label">Original language</span>
+              <input name="original_language" value="{{ values.get('original_language') or '' }}" maxlength="60">
+            </label>
+          </div>
+        </details>
       </fieldset>
 
       <fieldset>
         <legend>On the shelf</legend>
         <label class="field">
           <span class="label">Genre</span>
-          <select name="primary_genre_notation">
+          <select class="searchable" name="primary_genre_notation">
             <option value="">—</option>
             {% for notation, label in genres %}
               <option value="{{ notation }}"
@@ -145,11 +206,28 @@
         </label>
         <label class="field">
           <span class="label">Genre, in your own words</span>
-          <input name="genre_free_text" value="{{ values.get('genre_free_text') or '' }}" maxlength="120">
+          <input name="genre_free_text" value="{{ values.get('genre_free_text') or '' }}"
+                 list="genre-free-options" maxlength="120"
+                 placeholder="Pick one, or type a new one">
+          <datalist id="genre-free-options">
+            {% for name in genre_free_names|default([]) %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+          </datalist>
+        </label>
+        <label class="field field-wide">
+          <span class="label">Tags</span>
+          <input name="tags" value="{{ values.get('tags') or '' }}" list="tag-options"
+                 placeholder="Comma separated — pick existing, or type a new one">
+          <datalist id="tag-options">
+            {% for name in tag_names|default([]) %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+          </datalist>
         </label>
         <label class="field">
           <span class="label">Room</span>
-          <select name="room_id">
+          <select class="searchable" name="room_id">
             <option value="">—</option>
             {% for room_id, room_name in rooms %}
               <option value="{{ room_id }}" {% if values.get("room_id") == room_id %}selected{% endif %}>{{ room_name }}</option>
@@ -158,7 +236,7 @@
         </label>
         <label class="field">
           <span class="label">Ownership</span>
-          <select name="ownership_status">
+          <select class="searchable" name="ownership_status">
             {% for status in ownership_statuses %}
               <option value="{{ status }}"
                       {% if (values.get("ownership_status") or "owned") == status %}selected{% endif %}>{{ status }}</option>
@@ -167,13 +245,22 @@
         </label>
         <label class="field">
           <span class="label">Reading</span>
-          <select name="reading_state">
+          <select class="searchable" name="reading_state">
             {% for state in reading_states %}
               <option value="{{ state }}"
                       {% if (values.get("reading_state") or "unread") == state %}selected{% endif %}>{{ state }}</option>
             {% endfor %}
           </select>
         </label>
+        <div class="field field-wide">
+          <span class="label">Condition</span>
+      <select class="searchable" name="condition_rating">
+        <option value="" {% if not values.get("condition_rating") %}selected{% endif %}>Not rated</option>
+        {% for value, label in condition_ratings %}
+          <option value="{{ value }}" {% if values.get("condition_rating") == value %}selected{% endif %}>{{ value }} · {{ label }}</option>
+        {% endfor %}
+      </select>
+        </div>
         <label class="field">
           <span class="label">Gifted to</span>
           <input name="gifted_to" value="{{ values.get('gifted_to') or '' }}" maxlength="160">
@@ -210,6 +297,18 @@
         <label class="field">
           <span class="label">Thickness</span>
           <input name="thickness_mm" value="{{ values.get('thickness_mm') or '' }}" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span class="label">Spine colour</span>
+          <select name="cloth_hue">
+            <option value="">Automatic</option>
+            <option value="0" {% if values.get('cloth_hue') == 0 %}selected{% endif %}>Red</option>
+            <option value="38" {% if values.get('cloth_hue') == 38 %}selected{% endif %}>Orange</option>
+            <option value="130" {% if values.get('cloth_hue') == 130 %}selected{% endif %}>Green</option>
+            <option value="200" {% if values.get('cloth_hue') == 200 %}selected{% endif %}>Teal</option>
+            <option value="220" {% if values.get('cloth_hue') == 220 %}selected{% endif %}>Blue</option>
+            <option value="285" {% if values.get('cloth_hue') == 285 %}selected{% endif %}>Purple</option>
+          </select>
         </label>
         <label class="field field-wide">
           <span class="label">Inscription</span>
@@ -269,6 +368,28 @@
             </div>
           {% endfor %}
         </div>
+      </div>
+    {% endif %}
+
+    {# Deleting a book is destructive, so it asks for the account password. Only
+       render the delete form when the book has a real id — an empty id would
+       post to "/book//delete" and answer FastAPI's 404 ({"detail":"Not Found"}). #}
+    {% if book and book.id %}
+      <div class="card danger-zone">
+        <h2 class="card-title">Delete book</h2>
+        <p class="hint">Permanently removes this book and its photos from your library.</p>
+        <form method="post" action="/book/{{ book.id }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+          <label class="field">
+            <span class="label">Account password</span>
+            <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="confirm_delete" value="1" required>
+            Are you sure? This permanently deletes this book and its photos. It cannot be undone.
+          </label>
+          <button type="submit" class="btn btn-danger">Delete book</button>
+        </form>
       </div>
     {% endif %}
   </div>

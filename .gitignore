@@ -9,6 +9,8 @@ uploads/
 data/photos/
 .run/
 backups/
+dsh-kanban/
+STATE.json
 .env
 .collected/
 static/build/

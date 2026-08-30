@@ -24,6 +24,36 @@
             <th scope="row">Author{{ "" if book.authors and "," not in book.authors else "s" }}</th>
             <td>{{ book.authors or "Unknown author" }}</td>
           </tr>
+          {% if book.illustrator %}
+          <tr>
+            <th scope="row">Illustrator{{ "" if book.illustrator and "," not in book.illustrator else "s" }}</th>
+            <td>{{ book.illustrator }}</td>
+          </tr>
+          {% endif %}
+          {% if book.translator %}
+          <tr>
+            <th scope="row">Translator{{ "" if book.translator and "," not in book.translator else "s" }}</th>
+            <td>{{ book.translator }}</td>
+          </tr>
+          {% endif %}
+          {% if book.editor %}
+          <tr>
+            <th scope="row">Editor{{ "" if book.editor and "," not in book.editor else "s" }}</th>
+            <td>{{ book.editor }}</td>
+          </tr>
+          {% endif %}
+          {% if book.original_title %}
+          <tr>
+            <th scope="row">Original title</th>
+            <td>{{ book.original_title }}</td>
+          </tr>
+          {% endif %}
+          {% if book.original_language %}
+          <tr>
+            <th scope="row">Original language</th>
+            <td>{{ book.original_language }}</td>
+          </tr>
+          {% endif %}
           {% if book.series_name %}
             <tr>
               <th scope="row">Series</th>
@@ -38,6 +68,12 @@
             <th scope="row">Publication year</th>
             <td>{{ book.publication_year or "—" }}</td>
           </tr>
+          {% if book.print_year %}
+            <tr>
+              <th scope="row">Print year</th>
+              <td>{{ book.print_year }}</td>
+            </tr>
+          {% endif %}
           <tr>
             <th scope="row">Pages</th>
             <td>{{ book.page_count or "—" }}</td>
@@ -63,6 +99,18 @@
               <td>{{ book.primary_genre_notation }} · {{ genre_label or "unlabelled" }}</td>
             </tr>
           {% endif %}
+          {% if book.genre_free_text %}
+            <tr>
+              <th scope="row">Genre, in your own words</th>
+              <td>{{ book.genre_free_text }}</td>
+            </tr>
+          {% endif %}
+          {% if book.tags %}
+            <tr>
+              <th scope="row">Tags</th>
+              <td>{{ book.tags }}</td>
+            </tr>
+          {% endif %}
           <tr>
             <th scope="row">Price</th>
             {# The symbol and the thousands separator come from the server
@@ -77,6 +125,12 @@
             <th scope="row">Reading state</th>
             <td>{{ book.reading_state }}</td>
           </tr>
+          {% if book.condition_rating %}
+            <tr>
+              <th scope="row">Condition</th>
+              <td>{{ book.condition_rating }} · {{ condition_label }}</td>
+            </tr>
+          {% endif %}
           {% if book.gifted_to %}
             <tr>
               <th scope="row">Gifted to</th>

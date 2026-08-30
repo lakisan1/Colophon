@@ -41,8 +41,12 @@ class Filters:
     """A parsed, validated set of filters for one page."""
 
     statuses: tuple[str, ...] = ("owned",)
+    #: On the library page, which shelf the search covers: 'in_library'
+    #: (default), 'gone' (sold+gifted) or 'borrowed'. None elsewhere.
+    status: str | None = None
     q: str | None = None
     author_id: int | None = None
+    tag_id: int | None = None
     genre: str | None = None
     year: int | None = None
     reading: str | None = None
@@ -52,6 +56,8 @@ class Filters:
     gone_kind: str | None = None
     #: The scope this object was parsed under, so links can be rebuilt verbatim.
     scope: str = field(default="library", compare=False)
+    #: True when the user asked to search every shelf (incl. gone & borrowed).
+    search_all: bool = False
 
     def is_active(self) -> bool:
         """True if anything narrows the page beyond its scope."""
@@ -59,12 +65,14 @@ class Filters:
             (
                 self.q,
                 self.author_id,
+                self.tag_id,
                 self.genre,
                 self.year,
                 self.reading,
                 self.room_id,
                 self.no_room,
                 self.gone_kind,
+                self.search_all,
             )
         )
 
@@ -108,6 +116,10 @@ class Filters:
             )
             params["author_id"] = self.author_id
 
+        if self.tag_id is not None:
+            fragments.append("b.id IN (SELECT book_id FROM book_tags WHERE tag_id = :tag_id)")
+            params["tag_id"] = self.tag_id
+
         if self.genre:
             # D5 gives a book one primary genre; book_genres holds the extra,
             # filter-only ones. Filtering covers both.
@@ -144,6 +156,8 @@ class Filters:
             values["q"] = self.q
         if self.author_id is not None:
             values["author"] = str(self.author_id)
+        if self.tag_id is not None:
+            values["tag"] = str(self.tag_id)
         if self.genre:
             values["genre"] = self.genre
         if self.year is not None:
@@ -156,6 +170,10 @@ class Filters:
             values["room"] = "none"
         if self.gone_kind:
             values["kind"] = self.gone_kind
+        if self.status:
+            values["status"] = self.status
+        if self.search_all:
+            values["all"] = "1"
         values.update({key: value for key, value in overrides.items() if value})
         from urllib.parse import urlencode
 
@@ -188,6 +206,41 @@ def parse_filters(params: Mapping[str, Any], *, scope: str = "library") -> Filte
     if isinstance(requested, str) and requested in allowed:
         statuses = (requested,)
 
+    # The library search can also cover the gone shelf (sold+gifted) or the
+    # borrowed shelf; the route picks the matching query. Only meaningful on
+    # the library page, where `scope` is "library".
+    status: str | None = None
+    raw_status = params.get("status")
+    if (
+        scope == "library"
+        and isinstance(raw_status, str)
+        and raw_status
+        in (
+            "in_library",
+            "gone",
+            "borrowed",
+        )
+    ):
+        status = raw_status
+
+    # The shelf scope (library page) keeps `statuses` from the scope, but the
+    # `status` toggle switches the shelf; override `statuses` so the shared
+    # where-clause filters match the shelf being shown.
+    if status == "gone":
+        statuses = ("sold", "gifted")
+    elif status == "borrowed":
+        statuses = ("borrowed",)
+    elif status == "in_library":
+        statuses = ("owned",)
+
+    # A global search (a checkbox in Advanced) widens the scope to every shelf —
+    # owned, gone (sold/gifted), borrowed and wanted — and renders them all as
+    # spines instead of switching to the gone/borrowed tables.
+    search_all = params.get("all") == "1"
+    if search_all:
+        statuses = OWNERSHIP_STATUSES
+        status = None
+
     gone_kind: str | None = None
     kind = params.get("kind")
     if isinstance(kind, str) and kind in ("sold", "gifted") and set(allowed) >= {"sold", "gifted"}:
@@ -212,8 +265,10 @@ def parse_filters(params: Mapping[str, Any], *, scope: str = "library") -> Filte
 
     return Filters(
         statuses=statuses,
+        status=status,
         q=q,
         author_id=_positive_int(params.get("author")),
+        tag_id=_positive_int(params.get("tag")),
         genre=_clean_str(params.get("genre"), limit=MAX_GENRE_LENGTH),
         year=year,
         reading=reading,
@@ -221,4 +276,5 @@ def parse_filters(params: Mapping[str, Any], *, scope: str = "library") -> Filte
         no_room=no_room,
         gone_kind=gone_kind,
         scope=scope,
+        search_all=search_all,
     )

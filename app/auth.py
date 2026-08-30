@@ -121,7 +121,7 @@ def load_session(
         text(
             """
             SELECT s.id, s.user_id, s.csrf_token, s.created_at, s.last_seen_at, s.expires_at,
-                   u.username
+                   u.username, u.is_admin
             FROM sessions s JOIN users u ON u.id = s.user_id
             WHERE s.id = :id
             """
@@ -240,7 +240,7 @@ def clear_failures(session: Session, identifiers: list[str]) -> None:
 
 def find_user(session: Session, username: str) -> dict | None:
     record = session.execute(
-        text("SELECT id, username, password_hash FROM users WHERE username = :username"),
+        text("SELECT id, username, password_hash, is_admin FROM users WHERE username = :username"),
         {"username": username},
     ).first()
     return dict(record._mapping) if record else None
@@ -277,3 +277,41 @@ def drop_sessions_for_user(session: Session, user_id: int) -> int:
     result = session.execute(text("DELETE FROM sessions WHERE user_id = :id"), {"id": user_id})
     session.commit()
     return int(result.rowcount or 0)
+
+
+def create_user(session: Session, username: str, password: str) -> int:
+    """Create a plain (non-admin) account and return its id."""
+    session.execute(
+        text("INSERT INTO users (username, password_hash, is_admin) VALUES (:u, :h, 0)"),
+        {"u": username, "h": hash_password(password)},
+    )
+    user_id = int(session.execute(text("SELECT last_insert_rowid()")).scalar_one())
+    session.commit()
+    return user_id
+
+
+def delete_user(session: Session, user_id: int, username: str) -> None:
+    """Permanently delete an account and everything it owns.
+
+    The owner tables all carry ON DELETE CASCADE on owner_id, so deleting the
+    user row removes their books (and photos/author/series/rooms/settings/loans
+    link rows). The photo files on disk are removed first, and the account's
+    login-throttle history is dropped so a re-created username starts clean.
+    """
+    from app.settings import settings
+    from app.uploads import delete_upload
+
+    filenames = session.execute(
+        text("SELECT upload_filename, provider_filename FROM photos WHERE owner_id = :id"),
+        {"id": user_id},
+    ).all()
+    for upload_filename, provider_filename in filenames:
+        for filename in (upload_filename, provider_filename):
+            if filename:
+                delete_upload(settings.upload_dir, filename)
+    session.execute(
+        text("DELETE FROM login_attempts WHERE identifier = :i"),
+        {"i": f"user:{username.casefold()}"},
+    )
+    session.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+    session.commit()

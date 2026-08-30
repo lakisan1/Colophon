@@ -8,6 +8,7 @@
 # owner: another user's book id answers 404, not 403, so ids do not leak existence.
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
@@ -28,6 +29,7 @@ from app.lookup import fetch_provider_cover
 from app.money import format_price
 from app.page import page_context, page_prefs
 from app.settings import settings
+from app.shelf import CLOTH_HUES, cloth_hue
 from app.templating import templates
 from app.uploads import SLOTS, UploadError, delete_upload, read_upload, save_upload
 
@@ -35,6 +37,11 @@ router = APIRouter()
 
 OWNERSHIP_STATUSES = ("owned", "wanted", "borrowed", "sold", "gifted")
 READING_STATES = ("unread", "reading", "finished", "dnf")
+# The five-point condition scale, mirroring the dealer's words. The words are
+# the point: a bare stored 3 tells nobody anything, so the UI renders the word
+# next to the number, and the form and the page must never drift apart.
+CONDITION_RATINGS = (1, 2, 3, 4, 5)
+CONDITION_LABELS = {1: "Poor", 2: "Fair", 3: "Good", 4: "Very good", 5: "As new"}
 # Statuses whose copies are not on a shelf, so the room field is dropped for them.
 ABSENT_STATUSES = {"wanted", "sold", "gifted", "borrowed"}
 
@@ -75,6 +82,29 @@ _PREFILL_FIELDS = (
 )
 
 
+@router.get("/book/lookup")
+async def book_lookup(isbn: str = ""):
+    """Look up an ISBN on Open Library (free API) and return its metadata as JSON.
+
+    Used by the add/edit form: typing an ISBN prefills title, authors, publisher,
+    publication year, page count and language from Open Library.
+    """
+    from app.lookup import isbn_lookup
+
+    candidate = isbn_lookup(isbn) if isbn else None
+    if candidate is None:
+        return {"found": False}
+    return {
+        "found": True,
+        "title": candidate.title,
+        "authors": list(candidate.authors),
+        "publisher": candidate.publisher or "",
+        "publication_year": candidate.published_year or "",
+        "page_count": candidate.page_count or "",
+        "language": candidate.language or "",
+    }
+
+
 @router.post("/book/new", response_class=HTMLResponse)
 async def create_book(
     request: Request,
@@ -110,10 +140,10 @@ async def create_book(
             session, user.id, isbn=outcome.values.get("isbn"), title=outcome.values.get("title")
         )
     )
-    book_id = _insert_book(session, user.id, outcome.values)
+    _insert_book(session, user.id, outcome.values)
     session.commit()
     suffix = "&duplicate=1" if looks_duplicated else ""
-    return RedirectResponse(url=f"/book/{book_id}/edit?saved=1{suffix}", status_code=303)
+    return RedirectResponse(url=f"/?saved=1{suffix}", status_code=303)
 
 
 @router.get("/book/{book_id}/edit", response_class=HTMLResponse)
@@ -246,6 +276,7 @@ def book_page(
             # An unrecognised stored key is shown verbatim rather than blanked:
             # a detail page must not hide what the record says.
             format_label=fmt.label if fmt else book["format"],
+            condition_label=CONDITION_LABELS.get(book["condition_rating"]),
             loan=dict(loan._mapping) if loan else None,
             photos=photos,
             missing_photo_files=len(recorded_slots) - len(photos),
@@ -330,6 +361,85 @@ def remove_photo(
     return RedirectResponse(url=f"/book/{book_id}/edit", status_code=303)
 
 
+async def _delete_book(
+    request: Request,
+    book_id: int,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    form: Annotated[dict, Depends(read_form)],
+) -> HTMLResponse:
+    """Delete one book from the database.
+
+    Deleting is destructive, so the signed-in account's password must be
+    confirmed first; a wrong password re-renders the edit form with an error
+    and nothing is deleted.
+    """
+    book = _load_book(session, user.id, book_id)
+    if book is None:
+        return _not_found(request)
+
+    from app.auth import find_user, verify_password
+
+    submitted = (form.get("password") or "").strip()
+    account = find_user(session, user.username)
+    errors = []
+    if form.get("confirm_delete") != "1":
+        errors.append("Tick the box to confirm you really want to delete this book.")
+    if account is None or not verify_password(submitted, account["password_hash"]):
+        errors.append(
+            "Wrong password — the book was not deleted. Try again with your account password."
+        )
+    if errors:
+        outcome = FormOutcome()
+        outcome.errors.extend(errors)
+        return _render_form(
+            request,
+            session,
+            user,
+            outcome=outcome,
+            book=book,
+            lookup_query=None,
+            status_code=400,
+        )
+
+    # Remove stored photo files before their rows (FK cascade) go away.
+    filenames = session.execute(
+        text("SELECT upload_filename FROM photos WHERE book_id = :book_id"),
+        {"book_id": book_id},
+    ).scalars()
+    for filename in filenames:
+        if filename:
+            delete_upload(settings.upload_dir, filename)
+
+    session.execute(text("DELETE FROM books WHERE id = :book_id"), {"book_id": book_id})
+    session.commit()
+    return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/book/{book_id}/delete")
+async def delete_book(
+    request: Request,
+    book_id: int,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    form: Annotated[dict, Depends(read_form)],
+) -> HTMLResponse:
+    """Delete one book (singular path)."""
+    return await _delete_book(request, book_id, user, session, form)
+
+
+@router.post("/books/{book_id}/delete")
+async def delete_book_plural(
+    request: Request,
+    book_id: int,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[Session, Depends(get_session)],
+    form: Annotated[dict, Depends(read_form)],
+) -> HTMLResponse:
+    """Delete one book (plural path alias, so a path mismatch never 404s)."""
+    return await _delete_book(request, book_id, user, session, form)
+
+
 @router.get("/book/{book_id}/photos/{slot}")
 def get_photo(
     book_id: int,
@@ -383,8 +493,14 @@ _TEXT_FIELDS = (
     "gift_note",
     "inscription",
     "notes",
+    "illustrator",
+    "translator",
+    "editor",
+    "original_title",
+    "original_language",
     "series_name",
     "authors",
+    "tags",
     "cover_url",
 )
 _POSITIVE_INTS = ("page_count", "height_mm", "width_mm", "thickness_mm")
@@ -477,6 +593,21 @@ def _parse_form(form: dict) -> FormOutcome:
             else:
                 values["publication_year"] = year
 
+    # Print year is the year this physical copy came off the press, which can
+    # differ from the edition's publication year (a 1972 printing of a 1960
+    # book). Empty means unknown (NULL); the range mirrors publication year.
+    raw_print = (form.get("print_year") or "").strip()
+    if raw_print:
+        try:
+            print_year = int(raw_print)
+        except ValueError:
+            outcome.errors.append("Print year must be a number.")
+        else:
+            if not 1 <= print_year <= 9999:
+                outcome.errors.append("Print year must be between 1 and 9999.")
+            else:
+                values["print_year"] = print_year
+
     raw_price = (form.get("price") or "").strip()
     values["price"] = None
     if raw_price:
@@ -516,6 +647,36 @@ def _parse_form(form: dict) -> FormOutcome:
         else:
             values[name] = raw or None
 
+    # Condition is a scale, not a choice, so it is parsed like the bounded
+    # numbers above rather than an allowed-value list. Empty means unrated
+    # (NULL); a rating outside 1..5 or a non-number is an error naming the
+    # scale, never a silent clamp — a wrong rating is worse than no rating.
+    raw_condition = (form.get("condition_rating") or "").strip()
+    values["condition_rating"] = None
+    if raw_condition:
+        try:
+            rating = int(raw_condition)
+        except ValueError:
+            outcome.errors.append("Condition is a rating from 1 to 5 — pick one.")
+        else:
+            if rating not in CONDITION_RATINGS:
+                outcome.errors.append("Condition is a rating from 1 (Poor) to 5 (As new).")
+            else:
+                values["condition_rating"] = rating
+
+    raw_hue = (form.get("cloth_hue") or "").strip()
+    values["cloth_hue"] = None
+    if raw_hue:
+        try:
+            hue = int(raw_hue)
+        except ValueError:
+            outcome.errors.append("Spine colour must be one of the offered swatches.")
+        else:
+            if hue not in CLOTH_HUES:
+                outcome.errors.append("Spine colour must be one of the offered swatches.")
+            else:
+                values["cloth_hue"] = hue
+
     for name in ("is_signed", "is_sprayed_edge"):
         values[name] = bool(form.get(name))
 
@@ -542,10 +703,79 @@ def _pretty(name: str) -> str:
     return name.replace("_", " ").capitalize()
 
 
+def _random_dimensions() -> dict:
+    """Plausible millimetres for a book the person did not measure. Height is
+    the tall axis the shelf draws, width the page width, thickness the spine."""
+    return {
+        "height_mm": random.randint(190, 310),
+        "width_mm": random.randint(130, 260),
+        "thickness_mm": random.randint(8, 60),
+    }
+
+
+def _inherit_series_look(session: Session, owner_id: int, values: dict) -> None:
+    """Fill a series book's blank appearance from the first book in that series.
+
+    A series reads as one matching set, so the second and later books with no
+    measured dimensions and no chosen colour take the size and colour of the
+    first one. A series' very first book has no template and falls through to
+    the random defaults below.
+    """
+    name = (values.get("series_name") or "").strip()
+    if not name:
+        return
+    template = session.execute(
+        text(
+            """
+            SELECT b.height_mm, b.width_mm, b.thickness_mm, b.cloth_hue,
+                   COALESCE(a.sort_key, 'unknown') AS author_sort_key
+            FROM books b
+            JOIN series s ON s.id = b.series_id
+            LEFT JOIN book_authors ba ON ba.book_id = b.id AND ba.position = 1
+            LEFT JOIN authors a ON a.id = ba.author_id
+            WHERE s.owner_id = :owner_id AND s.name = :name
+              AND (b.height_mm IS NOT NULL OR b.thickness_mm IS NOT NULL
+                   OR b.cloth_hue IS NOT NULL)
+            ORDER BY b.id ASC
+            LIMIT 1
+            """
+        ),
+        {"owner_id": owner_id, "name": name},
+    ).first()
+    if template is None:
+        return
+    for column in ("height_mm", "width_mm", "thickness_mm"):
+        if values.get(column) is None:
+            values[column] = getattr(template, column, None)
+    if values.get("cloth_hue") is None:
+        # A series book with an explicit hue keeps it; otherwise match the colour
+        # the first book actually renders (its author-derived hue).
+        values["cloth_hue"] = (
+            template.cloth_hue
+            if template.cloth_hue is not None
+            else cloth_hue(template.author_sort_key)
+        )
+
+
 def _insert_book(session: Session, owner_id: int, values: dict) -> int:
+    # A book added without measured dimensions gets a random plausible size so
+    # the shelf does not draw a collapsed default (SPEC §6 draws true sizes);
+    # the same goes for colour when none was chosen.
+    # A series book with a blank appearance inherits the look of an earlier book
+    # in the same series; only a series' first book (or a book outside a series)
+    # falls back to the random defaults.
+    if values.get("series_name"):
+        _inherit_series_look(session, owner_id, values)
+    if any(values.get(name) is None for name in ("height_mm", "width_mm", "thickness_mm")):
+        for name, value in _random_dimensions().items():
+            if values.get(name) is None:
+                values[name] = value
+        if values.get("cloth_hue") is None:
+            values["cloth_hue"] = random.choice(CLOTH_HUES)
     session.execute(text(_insert_sql()), _insert_params(owner_id, values))
     book_id = _last_insert_id(session)
     _replace_authors(session, owner_id, book_id, values.get("authors"))
+    _replace_tags(session, owner_id, book_id, values.get("tags"))
     _apply_series(session, owner_id, book_id, values)
     _apply_provider_cover(session, owner_id, book_id, values.get("cover_url"))
     return book_id
@@ -553,7 +783,7 @@ def _insert_book(session: Session, owner_id: int, values: dict) -> int:
 
 # Form fields that are not columns on `books`: series and authors live in their
 # own tables and cover_url is a download instruction, so the UPDATE must skip them.
-_FORM_ONLY_KEYS = ("series_name", "authors", "cover_url")
+_FORM_ONLY_KEYS = ("series_name", "authors", "tags", "cover_url")
 
 
 def _update_book(
@@ -575,6 +805,7 @@ def _update_book(
         text(f"UPDATE books SET {assignments} WHERE id = :id"), {**values, "id": book_id}
     )
     _replace_authors(session, owner_id, book_id, values.get("authors"))
+    _replace_tags(session, owner_id, book_id, values.get("tags"))
     _apply_series(session, owner_id, book_id, values)
     _apply_provider_cover(session, owner_id, book_id, values.get("cover_url"))
 
@@ -586,6 +817,7 @@ _INSERT_COLUMNS = (
     "isbn",
     "publisher",
     "publication_year",
+    "print_year",
     "edition",
     "format",
     "page_count",
@@ -603,9 +835,16 @@ _INSERT_COLUMNS = (
     "is_signed",
     "inscription",
     "notes",
+    "illustrator",
+    "translator",
+    "editor",
+    "original_title",
+    "original_language",
     "height_mm",
     "width_mm",
     "thickness_mm",
+    "cloth_hue",
+    "condition_rating",
 )
 
 
@@ -622,7 +861,12 @@ def _insert_params(owner_id: int, values: dict) -> dict:
     params["reading_state"] = params.get("reading_state") or "unread"
     params["is_sprayed_edge"] = int(bool(params.get("is_sprayed_edge")))
     params["is_signed"] = int(bool(params.get("is_signed")))
-    return params
+    # SQLite cannot bind Decimal (e.g. price) or other non-primitive Python
+    # types, so coerce only Decimal values to float before the INSERT.
+    return {
+        key: (None if value is None else float(value) if isinstance(value, Decimal) else value)
+        for key, value in params.items()
+    }
 
 
 def _replace_authors(session: Session, owner_id: int, book_id: int, raw: str | None) -> None:
@@ -653,6 +897,26 @@ def _replace_authors(session: Session, owner_id: int, book_id: int, raw: str | N
             {"b": book_id, "a": author_id, "p": position, "o": owner_id},
         )
         position += 1
+
+
+def _replace_tags(session: Session, owner_id: int, book_id: int, raw: str | None) -> None:
+    """Comma-separated tag names in, deduped book_tags rows out (PK strips ties)."""
+    session.execute(text("DELETE FROM book_tags WHERE book_id = :book_id"), {"book_id": book_id})
+    for name in [part.strip() for part in (raw or "").split(",") if part.strip()]:
+        tag_id = session.execute(
+            text("SELECT id FROM tags WHERE owner_id = :owner_id AND name = :name"),
+            {"owner_id": owner_id, "name": name},
+        ).scalar()
+        if tag_id is None:
+            session.execute(
+                text("INSERT INTO tags (owner_id, name) VALUES (:owner_id, :name)"),
+                {"owner_id": owner_id, "name": name[:200]},
+            )
+            tag_id = _last_insert_id(session)
+        session.execute(
+            text("INSERT OR IGNORE INTO book_tags (book_id, tag_id, owner_id) VALUES (:b, :t, :o)"),
+            {"b": book_id, "t": tag_id, "o": owner_id},
+        )
 
 
 def _apply_series(session: Session, owner_id: int, book_id: int, values: dict) -> None:
@@ -732,6 +996,15 @@ def _load_book(session: Session, owner_id: int, book_id: int) -> dict | None:
             {"book_id": book["id"]},
         ).scalars()
     )
+    book["tags"] = ", ".join(
+        session.execute(
+            text(
+                "SELECT t.name FROM book_tags bt JOIN tags t ON t.id = bt.tag_id"
+                " WHERE bt.book_id = :book_id ORDER BY t.name"
+            ),
+            {"book_id": book["id"]},
+        ).scalars()
+    )
     return book
 
 
@@ -803,6 +1076,72 @@ def _render_form(
         text("SELECT id, name FROM rooms WHERE owner_id = :o OR owner_id IS NULL ORDER BY name"),
         {"o": user.id},
     ).all()
+    # The Series field offers the reader's existing series as a dropdown but still
+    # accepts a new name: _apply_series reuses a matching series or creates one.
+    series_names = list(
+        session.execute(
+            text("SELECT DISTINCT name FROM series WHERE owner_id = :o ORDER BY name"),
+            {"o": user.id},
+        ).scalars()
+    )
+    # Authors and Illustrator get the same drop-down-or-type-new behaviour as
+    # Series: offer the reader's existing values as suggestions but still accept
+    # a new name (a new author/illustrator is created on save).
+    author_names = list(
+        session.execute(
+            text("SELECT name FROM authors WHERE owner_id = :o ORDER BY sort_key"),
+            {"o": user.id},
+        ).scalars()
+    )
+    illustrator_names = list(
+        session.execute(
+            text(
+                "SELECT DISTINCT illustrator FROM books"
+                " WHERE owner_id = :o AND illustrator IS NOT NULL AND illustrator != ''"
+                " ORDER BY illustrator"
+            ),
+            {"o": user.id},
+        ).scalars()
+    )
+    # Translator and Editor use the same pick-or-type-new behaviour.
+    translator_names = list(
+        session.execute(
+            text(
+                "SELECT DISTINCT translator FROM books"
+                " WHERE owner_id = :o AND translator IS NOT NULL AND translator != ''"
+                " ORDER BY translator"
+            ),
+            {"o": user.id},
+        ).scalars()
+    )
+    editor_names = list(
+        session.execute(
+            text(
+                "SELECT DISTINCT editor FROM books"
+                " WHERE owner_id = :o AND editor IS NOT NULL AND editor != ''"
+                " ORDER BY editor"
+            ),
+            {"o": user.id},
+        ).scalars()
+    )
+    tag_names = list(
+        session.execute(
+            text("SELECT name FROM tags WHERE owner_id = :o ORDER BY name"),
+            {"o": user.id},
+        ).scalars()
+    )
+    # The free-text genre gets the same pick-or-type-new behaviour as the rest:
+    # offer what the reader has already written but accept a fresh value.
+    genre_free_names = list(
+        session.execute(
+            text(
+                "SELECT DISTINCT genre_free_text FROM books"
+                " WHERE owner_id = :o AND genre_free_text IS NOT NULL AND genre_free_text != ''"
+                " ORDER BY genre_free_text"
+            ),
+            {"o": user.id},
+        ).scalars()
+    )
     if book is None and not outcome:
         for name in _PREFILL_FIELDS:
             raw = request.query_params.get(name)
@@ -850,9 +1189,17 @@ def _render_form(
             max_plausible_mm=MAX_PLAUSIBLE_MM,
             genres=genres,
             rooms=rooms,
+            series_names=series_names,
+            author_names=author_names,
+            illustrator_names=illustrator_names,
+            translator_names=translator_names,
+            editor_names=editor_names,
+            tag_names=tag_names,
+            genre_free_names=genre_free_names,
             formats=[(key, spec.label) for key, spec in FORMAT_BY_KEY.items()],
             ownership_statuses=OWNERSHIP_STATUSES,
             reading_states=READING_STATES,
+            condition_ratings=[(n, CONDITION_LABELS[n]) for n in CONDITION_RATINGS],
             slots=SLOTS,
             lookup=lookup,
         ),

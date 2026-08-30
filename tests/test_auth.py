@@ -143,7 +143,9 @@ def test_a_mismatched_csrf_token_is_refused(auth_client: TestClient) -> None:
 
 def test_logout_ends_the_session(auth_client: TestClient) -> None:
     sign_in(auth_client)
-    page = auth_client.get("/")
+    # The Sign out button lives in the settings panel, so its CSRF token comes
+    # from the settings page rather than the shelf header.
+    page = auth_client.get("/settings")
     token = _csrf_from(page.text)
 
     auth_client.post("/logout", data={"csrf_token": token}, follow_redirects=False)
@@ -486,6 +488,20 @@ def test_a_password_change_ends_other_sessions(auth_client: TestClient) -> None:
 # ---------------------------------------------------------------- settings page
 
 
+def test_settings_page_has_no_back_to_shelf_button(auth_client: TestClient) -> None:
+    sign_in(auth_client)
+    page = auth_client.get("/settings")
+    assert page.status_code == 200
+    assert "Back to the shelf" not in page.text
+
+
+def test_settings_page_includes_forms_css(auth_client: TestClient) -> None:
+    sign_in(auth_client)
+    page = auth_client.get("/settings")
+    assert page.status_code == 200
+    assert 'href="/static/css/forms.css"' in page.text
+
+
 def test_settings_can_be_changed_and_are_remembered(auth_client: TestClient) -> None:
     sign_in(auth_client)
     token = _csrf_from(auth_client.get("/settings").text)
@@ -514,16 +530,43 @@ def test_the_shelf_follows_the_stored_zoom(auth_client: TestClient) -> None:
     auth_client.post(
         "/settings",
         data={
-            "csrf_token": token,
             "theme": "light",
             "zoom_preset": "L",
-            "currency_symbol": "€",
-            "date_format": "dd.mm.yyyy",
+            "currency_symbol": "$",
+            "date_format": "yyyy-mm-dd",
             "time_format": "24h",
+            "csrf_token": token,
         },
     )
 
-    assert 'aria-current="true">L<' in auth_client.get("/").text
+    shelf = auth_client.get("/")
+    assert shelf.status_code == 200
+    assert 'aria-current="true">L<' in shelf.text
+
+
+def test_searchable_assets_are_included_on_the_shelf(auth_client: TestClient) -> None:
+    sign_in(auth_client)
+    page = auth_client.get("/")
+    assert page.status_code == 200
+    assert 'src="/static/js/searchable.js"' in page.text
+    assert 'href="/static/css/searchable.css"' in page.text
+    assert 'select class="searchable' in page.text
+
+
+def test_book_form_selects_are_searchable(auth_client: TestClient) -> None:
+    sign_in(auth_client)
+    page = auth_client.get("/book/new")
+    assert page.status_code == 200
+    assert 'src="/static/js/searchable.js"' in page.text
+    assert 'select class="searchable' in page.text
+
+
+def test_settings_selects_are_searchable(auth_client: TestClient) -> None:
+    sign_in(auth_client)
+    page = auth_client.get("/settings")
+    assert page.status_code == 200
+    assert 'src="/static/js/searchable.js"' in page.text
+    assert 'select class="searchable' in page.text
 
 
 def test_an_invalid_setting_is_rejected(auth_client: TestClient) -> None:

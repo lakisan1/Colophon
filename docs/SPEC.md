@@ -107,7 +107,7 @@ Shelf organisation: sections **by genre**; within a section, sort by **series nu
 
 - **A1 Scale:** height is always strictly linear in millimetres. Reference height 240 mm;
   `scale = shelf_row_px / 240`.
-- **A2 Zoom presets:** S = 160 px, M = 220 px, L = 300 px row height, persisted per user.
+- **A2 Zoom presets:** S = 220 px, M = 300 px, L = 400 px row height, persisted per user.
   Proportions are exactly true at L.
 - **A3 Spine width:** `spine_px = clamp(thickness_mm * scale, MIN_SPINE[zoom], 90)`.
   Clamping is a deliberate, zoom-dependent deviation from strict proportionality so thin

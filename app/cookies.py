@@ -5,7 +5,7 @@
 #
 # `Secure` is off by default and switched on with COLOPHON_COOKIE_SECURE=1. That
 # is deliberate: local development and any plain-HTTP LAN install would otherwise
-# be unable to log in at all. TLS deployments must set it — see docs/GITHUB.md.
+# be unable to log in at all. TLS deployments must set COLOPHON_COOKIE_SECURE=1.
 from __future__ import annotations
 
 from fastapi import Response

@@ -36,10 +36,31 @@ def _stored(book_id: int, column: str) -> int | None:
         ).scalar_one()
 
 
+def _created_id(title: str | None) -> int:
+    """The id of the book with this title (latest one). The add-book redirect now
+    goes to the home page (?saved=1) and no longer carries the id in the path, so
+    tests read it back from the database."""
+    from sqlalchemy import text as _t
+
+    from app.db import SessionLocal
+
+    with SessionLocal() as session:
+        if title:
+            return int(
+                session.execute(
+                    _t("SELECT id FROM books WHERE title = :t ORDER BY id DESC LIMIT 1"),
+                    {"t": title},
+                ).scalar_one()
+            )
+        return int(
+            session.execute(_t("SELECT id FROM books ORDER BY id DESC LIMIT 1")).scalar_one()
+        )
+
+
 def _create(seeded_client: TestClient, **fields: str) -> int:
     response = seeded_client.post("/book/new", data=fields, follow_redirects=False)
     assert response.status_code == 303
-    return int(response.headers["location"].split("/")[2])
+    return _created_id(fields.get("title"))
 
 
 def test_a_700_mm_width_saves_nothing_and_asks_the_question(
@@ -72,7 +93,7 @@ def test_confirming_a_700_mm_width_saves_it(seeded_client: TestClient) -> None:
 
     assert response.status_code == 303
     assert _book_count() == before + 1
-    new_id = int(response.headers["location"].split("/")[2])
+    new_id = _created_id("Fat Paperback")
     assert _stored(new_id, "width_mm") == 700
 
 
@@ -120,7 +141,7 @@ def test_thickness_is_covered_by_the_same_rule(seeded_client: TestClient) -> Non
         follow_redirects=False,
     )
     assert saved.status_code == 303
-    assert _stored(int(saved.headers["location"].split("/")[2]), "thickness_mm") == 600
+    assert _stored(_created_id("Slab"), "thickness_mm") == 600
 
 
 def test_an_ordinary_book_needs_no_confirmation(seeded_client: TestClient) -> None:

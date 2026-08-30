@@ -17,6 +17,12 @@ from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+# Reject decompression bombs: an image whose pixel count exceeds this limit
+# raises Image.DecompressionBombError on open, instead of allocating memory for
+# a huge decoded raster inside a small file (CWE-400). 25M pixels (~100 MB) is
+# well above any sane book photo while staying safe.
+Image.MAX_IMAGE_PIXELS = 25_000_000
+
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_DIMENSION = 1600
 MIN_DIMENSION = 40

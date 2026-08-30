@@ -394,7 +394,6 @@ def test_every_shelf_requires_a_signed_in_user(client: TestClient) -> None:
         "/borrowed",
         "/gone",
         "/wishlist",
-        "/search",
         "/stats",
         "/export.csv",
         "/export.json",

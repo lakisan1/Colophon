@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from app import lookup as lookup_module
-from app.lookup import fetch_provider_cover, search
+from app.lookup import fetch_provider_cover, isbn_lookup, search
 
 
 def _stub(handler, calls: list[str]):
@@ -220,3 +220,66 @@ def test_provider_cover_download_failure_is_none(monkeypatch: pytest.MonkeyPatch
 def test_provider_cover_rejects_non_http_urls() -> None:
     assert fetch_provider_cover("file:///etc/passwd") is None
     assert fetch_provider_cover("") is None
+
+
+def test_isbn_lookup_calls_the_open_library_isbn_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["bibkeys"] = request.url.params.get("bibkeys", "")
+        seen["jscmd"] = request.url.params.get("jscmd", "")
+        seen["ua"] = request.headers.get("User-Agent", "")
+        return httpx.Response(
+            200,
+            json={
+                "ISBN:9780140328721": {
+                    "title": "Fantastic Mr. Fox",
+                    "authors": [{"name": "Roald Dahl"}],
+                    "publishers": [{"name": "Puffin"}],
+                    "publish_date": "October 1, 1988",
+                    "number_of_pages": 96,
+                    "languages": [{"key": "/languages/eng"}],
+                }
+            },
+        )
+
+    _install(monkeypatch, handler)
+    candidate = isbn_lookup("978-0140328721")
+
+    assert seen["path"].endswith("/api/books")
+    assert seen["bibkeys"] == "ISBN:9780140328721"  # dashes normalised away
+    assert seen["jscmd"] == "data"
+    assert seen["ua"].startswith("Colophon/")
+    assert candidate is not None
+    assert candidate.title == "Fantastic Mr. Fox"
+    assert candidate.authors == ("Roald Dahl",)
+    assert candidate.publisher == "Puffin"
+    assert candidate.published_year == 1988
+    assert candidate.page_count == 96
+    assert candidate.language == "English"
+    assert candidate.isbn == "9780140328721"
+    assert candidate.provider == "openlibrary"
+
+
+def test_isbn_lookup_returns_none_for_an_invalid_isbn(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _install(monkeypatch, lambda request: httpx.Response(200, json={}))
+    assert isbn_lookup("not-an-isbn") is None
+    assert calls == []  # no network call for garbage
+
+
+def test_isbn_lookup_returns_none_when_the_edition_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install(monkeypatch, lambda request: httpx.Response(200, json={}))
+    assert isbn_lookup("9780140328721") is None
+
+
+def test_isbn_lookup_returns_none_on_a_provider_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("connection timed out")
+
+    _install(monkeypatch, handler)
+    assert isbn_lookup("9780140328721") is None

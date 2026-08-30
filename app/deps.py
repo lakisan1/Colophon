@@ -40,6 +40,7 @@ class CurrentUser:
     username: str
     session_id: str | None = None
     csrf_token: str | None = None
+    is_admin: bool = False
 
 
 def current_user(
@@ -81,4 +82,5 @@ def current_user(
         username=str(row["username"]),
         session_id=str(row["id"]),
         csrf_token=str(row["csrf_token"]),
+        is_admin=bool(row["is_admin"]),
     )

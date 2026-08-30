@@ -56,12 +56,12 @@ def test_every_spine_carries_geometry_and_a_cloth_colour(seeded_client: TestClie
 
 
 def test_zoom_L_is_exactly_proportional(seeded_client: TestClient) -> None:
-    """A2 checked through HTTP: scale is 1.25, so 300 mm of atlas is 375 px."""
+    """A2 checked through HTTP: scale is 1.6667, so 300 mm of atlas is 500 px."""
     html = seeded_client.get("/?zoom=L").text
     heights = [float(b["height"]) for b in _books(html)]
 
-    assert max(heights) == pytest.approx(375.0)  # 300 mm oversized folio
-    assert min(heights) == pytest.approx(127.5)  # 102 mm board book
+    assert max(heights) == pytest.approx(500.0)  # 300 mm oversized folio
+    assert min(heights) == pytest.approx(170.0)  # 102 mm board book
 
 
 def test_a_row_grows_to_hold_the_tallest_book_on_it(seeded_client: TestClient) -> None:
@@ -69,11 +69,11 @@ def test_a_row_grows_to_hold_the_tallest_book_on_it(seeded_client: TestClient) -
     html = seeded_client.get("/?zoom=L").text
     chunks = html.split('class="shelf-row" style="')[1:]
 
-    tall = [chunk for chunk in chunks if "--book-height: 375.0px" in chunk]
+    tall = [chunk for chunk in chunks if "--book-height: 500.0px" in chunk]
     assert tall, "expected a 300 mm book to render at zoom L"
     for chunk in tall:
         row_height = float(re.search(r"--row-height: ([\d.]+)px", chunk).group(1))
-        assert row_height >= 375.0
+        assert row_height >= 500.0
 
 
 def test_zoom_S_is_smaller_than_zoom_L_for_the_same_book(seeded_client: TestClient) -> None:
@@ -115,12 +115,14 @@ def test_sections_are_labelled_by_genre(seeded_client: TestClient) -> None:
     assert not [label for label in labels if "/" in label]
 
 
-def test_series_badge_appears_only_on_spines_wide_enough_for_it(seeded_client: TestClient) -> None:
+def test_series_badge_is_shown_at_every_zoom(seeded_client: TestClient) -> None:
+    """D9: the series number is not gated by level of detail — a thin spine still
+    shows which book in a series it is, so every zoom shows the same badges."""
     at_L = seeded_client.get("/?zoom=L").text
     at_S = seeded_client.get("/?zoom=S").text
 
     assert 'class="series-badge"' in at_L
-    assert at_S.count('class="series-badge"') <= at_L.count('class="series-badge"')
+    assert at_S.count('class="series-badge"') == at_L.count('class="series-badge"')
 
 
 def test_horus_heresy_reads_in_order_with_its_interquels(seeded_client: TestClient) -> None:

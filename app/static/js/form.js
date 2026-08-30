@@ -54,3 +54,37 @@
     event.preventDefault();
   });
 })();
+
+
+// Open Library ISBN lookup (M4): typing an ISBN prefills the book fields.
+// Best-effort enhancement — if Open Library is unreachable, nothing is filled
+// and the person still types by hand. Never overwrites what is already there.
+(function () {
+  "use strict";
+
+  var ISBN_FIELDS = [
+    "title", "authors", "publisher", "publication_year", "page_count", "language"
+  ];
+
+  document.addEventListener("change", function (event) {
+    var field = event.target;
+    // Only the book form's ISBN input opts in; the lookup/photo forms do not.
+    if (!field || field.name !== "isbn") return;
+    var isbn = field.value.trim();
+    if (!isbn) return;
+
+    fetch("/book/lookup?isbn=" + encodeURIComponent(isbn))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (!data.found) return;
+        ISBN_FIELDS.forEach(function (name) {
+          var target = document.querySelector('input[name="' + name + '"]');
+          if (!target || target.value.trim()) return;
+          target.value = name === "authors"
+            ? (Array.isArray(data.authors) ? data.authors.join(", ") : data.authors)
+            : (data[name] || "");
+        });
+      })
+      .catch(function () { /* lookup is best-effort */ });
+  });
+})();

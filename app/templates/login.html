@@ -1,22 +1,62 @@
-{# The only page a stranger can see (SPEC §13). #}
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title | default('Colophon — Sign in', true) }}</title>
+  {# The login page defaults to dark; apply a saved choice before first paint so
+     the page never flashes from dark to light. #}
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("colophon-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="login-title">
+      <button type="button" class="login-theme-toggle" data-login-theme aria-pressed="false" aria-label="Switch to light theme">☀️</button>
+      <h1 class="login-title" id="login-title">Colophon</h1>
 
-{% block content %}
-  <div class="login-shell">
-    <h1 class="login-title">Colophon</h1>
-    {% if error %}<p class="login-error" role="alert">{{ error }}</p>{% endif %}
-    <form class="card login-form" method="post" action="/login">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label class="field">
-        <span class="label">Username</span>
-        <input name="username" autocomplete="username" maxlength="150" required autofocus>
-      </label>
-      <label class="field">
-        <span class="label">Password</span>
-        <input name="password" type="password" autocomplete="current-password" maxlength="200" required>
-      </label>
-      <p class="form-actions"><button type="submit" class="btn btn-primary">Sign in</button></p>
-    </form>
-    <p class="hint">Locked out? On the server: <code>python -m app.tools.unlock --username admin</code></p>
-  </div>
-{% endblock %}
+      {% if error %}
+        <div class="login-error" role="alert">
+          <span>{{ error }}</span>
+          <button type="button" data-login-dismiss aria-label="Dismiss error">&times;</button>
+        </div>
+      {% endif %}
+
+      <form method="post" action="/login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label class="login-field" for="login-user">
+          <span class="login-label">Username</span>
+          <input class="login-input" id="login-user" name="username" type="text"
+                 autocomplete="username" required autofocus>
+        </label>
+
+        <label class="login-field" for="login-pass">
+          <span class="login-label">Password</span>
+          <span class="login-input-wrap">
+            <input class="login-input" id="login-pass" name="password" type="password"
+                   autocomplete="current-password" required>
+            <button type="button" class="login-toggle" data-login-toggle aria-pressed="false">Show</button>
+          </span>
+        </label>
+
+        <button class="login-submit" type="submit">Sign in</button>
+      </form>
+
+      <p class="login-hint">
+        Demo account &mdash; user <code>demo</code>, password <code>demo</code>.
+      </p>
+    </section>
+  </main>
+
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

@@ -28,6 +28,12 @@
   --paper: #f6f1e7;
   --paper-raised: #fffdf8;
 
+  /* Inputs, raised panels, hairline rules and dim text (M6 filter/table/stats). */
+  --surface: #fff;
+  --surface-raised: rgba(255, 255, 255, 0.55);
+  --rule: rgba(0, 0, 0, 0.12);
+  --ink-dim: #5a5045;
+
   /* Focus ring for keyboard navigation; visible on both paper and wood. */
   --focus-ring: #b3541e;
   --focus-ring-offset: #f6f1e7;
@@ -56,6 +62,12 @@
   --ink-muted: #a99c8a;
   --paper: #1e1913;
   --paper-raised: #2a231b;
+
+  /* Inputs, raised panels, hairline rules and dim text, dark palette. */
+  --surface: #1e1913;
+  --surface-raised: #2a231b;
+  --rule: rgba(255, 255, 255, 0.16);
+  --ink-dim: #a99c8a;
 
   --focus-ring: #e78a4e;
   --focus-ring-offset: #1e1913;

@@ -27,7 +27,7 @@ Every entry was decided by Lazar (2027-08-27) or is a documented assumption by t
 | # | Topic | Decision |
 |---|---|---|
 | A1 | Scale | Height is always strictly linear in mm. Reference height 240 mm. `scale = shelf_row_px / 240`. |
-| A2 | Zoom presets | S=160px, M=220px, L=300px row height. Persisted per user. Proportions are exactly true at L. |
+| A2 | Zoom presets | S=220px, M=300px, L=400px row height. Persisted per user. Proportions are exactly true at L. |
 | A3 | Spine width | `spine_px = clamp(thickness_mm * scale, MIN_SPINE[zoom], 90)`. Clamping is a deliberate, zoom-dependent deviation from strict proportionality so thin spines stay clickable. |
 | A4 | Level of detail | `>=26px`: rotated title + author + series badge. `14–25px`: title only. `<14px`: colour sliver + tooltip. |
 | A5 | Spine art | Real uploaded spine photo when present, otherwise generated cloth spine (CSS gradient + SVG noise), colour = stable hash of author name into a theme-safe HSL band. |

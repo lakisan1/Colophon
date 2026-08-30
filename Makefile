@@ -20,7 +20,7 @@ dev:
 # migrate first: a database behind head 500s on the login page with
 # 'no such table', which is a confusing way to discover a missing migration.
 serve: migrate
-	$(VENV)/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+	$(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 test:
 	$(VENV)/bin/pytest -q

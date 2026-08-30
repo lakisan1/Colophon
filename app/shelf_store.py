@@ -24,6 +24,7 @@ _SHELF_SQL = """
         b.series_position                   AS series_position,
         b.height_mm                         AS height_mm,
         b.thickness_mm                      AS thickness_mm,
+        b.cloth_hue                         AS cloth_hue,
         s.name                              AS series_name,
         g.notation                          AS genre_notation,
         COALESCE(g.label, 'Uncategorised')  AS genre_label,
@@ -172,6 +173,25 @@ def author_options(session: Session, owner_id: int, limit: int = 500) -> list[di
     return [dict(row._mapping) for row in rows]
 
 
+def tag_options(session: Session, owner_id: int, limit: int = 500) -> list[dict]:
+    rows = session.execute(
+        text(
+            """
+            SELECT t.id AS id, t.name AS name, count(bt.book_id) AS book_count
+            FROM tags t
+            JOIN book_tags bt ON bt.tag_id = t.id
+            JOIN books b ON b.id = bt.book_id AND b.owner_id = t.owner_id
+            WHERE t.owner_id = :owner_id
+            GROUP BY t.id
+            ORDER BY t.name
+            LIMIT :limit
+            """
+        ),
+        {"owner_id": owner_id, "limit": limit},
+    )
+    return [dict(row._mapping) for row in rows]
+
+
 def genre_options(session: Session, owner_id: int) -> list[dict]:
     rows = session.execute(
         text(
@@ -187,3 +207,18 @@ def genre_options(session: Session, owner_id: int) -> list[dict]:
         {"owner_id": owner_id},
     )
     return [dict(row._mapping) for row in rows]
+
+
+def year_options(session: Session, owner_id: int) -> list[dict]:
+    rows = session.execute(
+        text(
+            """
+            SELECT DISTINCT b.publication_year AS year
+            FROM books b
+            WHERE b.owner_id = :owner_id AND b.publication_year IS NOT NULL
+            ORDER BY b.publication_year DESC
+            """
+        ),
+        {"owner_id": owner_id},
+    )
+    return [{"year": row.year} for row in rows]

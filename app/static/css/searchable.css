@@ -1,0 +1,54 @@
+/* Searchable select widget (enhances <select class="searchable">). */
+
+/* The native select is kept in the DOM for form submission but hidden. */
+select.searchable-native {
+  display: none;
+}
+
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  border: 1px solid var(--wood-shelf-dark, #8a7a63);
+  border-radius: 4px;
+  background: var(--paper, #fff);
+  color: var(--ink, #222);
+}
+
+.searchable-options {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid var(--wood-shelf-dark, #8a7a63);
+  border-radius: 4px;
+  background: var(--paper, #fff);
+  color: var(--ink, #222);
+  z-index: 20;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.searchable-options.open {
+  display: block;
+}
+
+.searchable-options li {
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+}
+
+.searchable-options li:hover,
+.searchable-options li.selected {
+  background: rgba(111, 90, 60, 0.18);
+}

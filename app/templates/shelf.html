@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-  {% include "_nav.html" %}
+  {% if notice %}<ul class="notices"><li class="notice">{{ notice }}</li></ul>{% endif %}
   <div class="shelf-toolbar">
     <h1 class="shelf-heading">
       {% if active_shelf == "wishlist" %}Wishlist{% else %}My library{% endif %}
@@ -18,7 +18,6 @@
 
     {# A2: three presets. Plain links so zoom works with JavaScript disabled. #}
     <div class="shelf-actions">
-      <a class="shelf-add" href="/book/new">Add a book</a>
       <nav class="zoom-switch" aria-label="Zoom">
       {% for preset in ["S", "M", "L"] %}
         {% if preset == zoom %}

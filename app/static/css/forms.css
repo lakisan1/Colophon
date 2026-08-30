@@ -112,10 +112,53 @@ textarea:focus-visible {
 
 .hint { font-size: 0.78rem; color: var(--ink-muted); }
 
+/* Admin: user-management list. */
+.user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }
+.user-row {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.55));
+}
+.user-name { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+.user-delete { margin-top: 0.5rem; }
+
 /* ---------- lookup ---------- */
 
-.lookup-card { display: flex; gap: 0.6rem; align-items: flex-end; flex-wrap: wrap; }
-.lookup-card .field { flex: 1 1 18rem; }
+/* The Open Library search stacks vertically: the field on top and the Search
+   button always beneath it, on every screen width. */
+.lookup-card { display: flex; flex-direction: column; gap: 0.6rem; align-items: stretch; }
+.lookup-card .field { width: 100%; }
+.lookup-card .btn { align-self: flex-start; }
+
+/* The "Advanced" disclosure on the book form: a bordered, collapsible block that
+   keeps less-common cataloguing fields out of the way. It spans the fieldset's
+   full width (grid-column 1/-1) so it lines up with the field-wide rows above,
+   and its body lays its own fields out on the same 13rem columns. */
+.advanced {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+  border: 1px solid var(--rule, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.55));
+}
+.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink-muted, #5a5045);
+  list-style: none;
+  user-select: none;
+}
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::before { content: "\25B8 "; }
+.advanced[open] summary::before { content: "\25BE "; }
+.advanced-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.6rem 0.9rem;
+  margin-top: 0.5rem;
+}
 
 .lookup-results { margin-top: -0.4rem; }
 
@@ -171,3 +214,29 @@ textarea:focus-visible {
 }
 
 .crop summary { cursor: pointer; }
+
+/* ---------- condition rating (1-5) ---------- */
+
+.rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.rating-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 5px;
+  background: var(--paper);
+}
+
+/* The checked chip is raised, so the current rating reads at a glance. */
+.rating-choice:has(input:checked) {
+  background: var(--wood-shelf);
+  border-color: var(--wood-shelf-dark);
+  font-weight: 600;
+}

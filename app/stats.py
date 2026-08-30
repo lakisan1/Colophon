@@ -24,6 +24,10 @@ class Dashboard:
     authors: int = 0
     series: int = 0
     loans_out: int = 0
+    # Total value of the books the owner currently holds (owned/wanted/borrowed).
+    # Sold and gifted books are no longer part of the collection, so their price
+    # is not counted. 0.0 when nothing is held or no price is set.
+    value: float = 0.0
 
     @property
     def gone(self) -> int:
@@ -60,7 +64,10 @@ def dashboard(session: Session, owner_id: int) -> Dashboard:
                    JOIN books b2 ON b2.id = ba.book_id WHERE b2.owner_id = :o)  AS authors,
                 (SELECT count(*) FROM series s WHERE s.owner_id = :o)           AS series,
                 (SELECT count(*) FROM loans l
-                   WHERE l.owner_id = :o AND l.returned_at IS NULL)             AS loans_out
+                   WHERE l.owner_id = :o AND l.returned_at IS NULL)             AS loans_out,
+                (SELECT COALESCE(sum(price), 0) FROM books
+                  WHERE owner_id = :o
+                    AND ownership_status NOT IN ('sold', 'gifted')) AS value
             FROM books WHERE owner_id = :o
             """
         ),
@@ -79,4 +86,5 @@ def dashboard(session: Session, owner_id: int) -> Dashboard:
         authors=int(totals[2] or 0),
         series=int(totals[3] or 0),
         loans_out=int(totals[4] or 0),
+        value=float(totals[5] or 0),
     )

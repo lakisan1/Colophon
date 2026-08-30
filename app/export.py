@@ -31,6 +31,7 @@ EXPORT_FIELDS: tuple[tuple[str, str], ...] = (
     ("extra_genres", "extra_genres"),
     ("format", "format"),
     ("publication_year", "year"),
+    ("print_year", "print_year"),
     ("page_count", "pages"),
     ("language", "language"),
     ("publisher", "publisher"),
@@ -38,6 +39,7 @@ EXPORT_FIELDS: tuple[tuple[str, str], ...] = (
     ("room", "room"),
     ("ownership_status", "ownership_status"),
     ("reading_state", "reading_state"),
+    ("condition_rating", "condition_rating"),
     ("borrowed_to", "borrowed_to"),
     ("loan_due", "loan_due"),
     ("price", "price"),
@@ -70,6 +72,7 @@ _EXPORT_SQL = """
           WHERE bg.book_id = b.id) AS extra_genres,
         b.format               AS format,
         b.publication_year     AS publication_year,
+        b.print_year           AS print_year,
         b.page_count           AS page_count,
         b.language             AS language,
         b.publisher            AS publisher,
@@ -77,6 +80,7 @@ _EXPORT_SQL = """
         r.name                 AS room,
         b.ownership_status     AS ownership_status,
         b.reading_state        AS reading_state,
+        b.condition_rating     AS condition_rating,
         l.borrowed_to          AS borrowed_to,
         l.expected_return_date AS loan_due,
         b.price                AS price,
@@ -165,4 +169,11 @@ def _csv_cell(value: Any) -> str:
         return "true" if value else "false"
     # No Decimal branch: money is normalised to float by _normalise_row above, so a
     # cell formatter that silently stringified a Decimal would be dead code here.
-    return str(value)
+    text = str(value)
+    # Spreadsheet apps treat a cell as a formula when it begins with =, +, - or
+    # @ (also after leading tab/CR whitespace). Prefix those cells with a single
+    # quote so they stay text — the standard CWE-1236 / CSV-injection mitigation.
+    stripped = text.lstrip("\t\r\n ")
+    if stripped.startswith(("=", "+", "-", "@")):
+        return "'" + text
+    return text

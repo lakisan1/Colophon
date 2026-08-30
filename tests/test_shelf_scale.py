@@ -8,14 +8,16 @@ from app.shelf import (
     CLOTH_HUES,
     LOD_FULL_PX,
     LOD_TITLE_PX,
-    MAX_SPINE_PX,
     MIN_SPINE_PX,
     REFERENCE_HEIGHT_MM,
+    TALL_BOOK_MARGIN_PX,
+    ZOOM_ROW_PX,
     Spine,
     build_shelf,
     cloth_hue,
     height_px,
     level_of_detail,
+    max_spine_px,
     normalise_zoom,
     order_spines,
     scale_for,
@@ -25,14 +27,14 @@ from app.shelf import (
 
 def test_scale_is_row_height_over_the_reference_book() -> None:
     """A1: scale = shelf_row_px / 240."""
-    assert scale_for("L") == pytest.approx(300.0 / REFERENCE_HEIGHT_MM)
-    assert scale_for("S") == pytest.approx(160.0 / REFERENCE_HEIGHT_MM)
+    assert scale_for("L") == pytest.approx(400.0 / REFERENCE_HEIGHT_MM)
+    assert scale_for("S") == pytest.approx(220.0 / REFERENCE_HEIGHT_MM)
 
 
 def test_proportions_are_exactly_true_at_zoom_L() -> None:
     """A2's promise: at L a 240 mm book is 300 px and a 120 mm book is 150 px."""
-    assert height_px(240, "L") == pytest.approx(300.0)
-    assert height_px(120, "L") == pytest.approx(150.0)
+    assert height_px(240, "L") == pytest.approx(400.0)
+    assert height_px(120, "L") == pytest.approx(200.0)
     assert height_px(120, "L") == pytest.approx(height_px(240, "L") / 2)
 
 
@@ -54,7 +56,10 @@ def test_thin_spines_are_clamped_to_the_clickable_floor(zoom: str) -> None:
 
 @pytest.mark.parametrize("zoom", ["S", "M", "L"])
 def test_thick_spines_are_capped(zoom: str) -> None:
-    assert spine_px(400, zoom) == MAX_SPINE_PX
+    assert spine_px(400, zoom) == max_spine_px(zoom)
+    # The cap scales with zoom, so a clamped spine still grows when you zoom in:
+    # the bug was a fixed 90 px ceiling that froze very thick spines at every preset.
+    assert max_spine_px("S") < max_spine_px("M") < max_spine_px("L")
 
 
 def test_spine_width_is_monotonic_in_thickness_above_the_floor() -> None:
@@ -175,7 +180,7 @@ def _row(**overrides) -> dict:
     return {**base, **overrides}
 
 
-def test_build_shelf_groups_by_genre_in_curated_order() -> None:
+def test_build_shelf_groups_by_genre_in_alphabetical_order() -> None:
     sections = build_shelf(
         [
             _row(book_id=1, genre_notation="FIC000000", genre_label="Fiction", genre_sort_order=9),
@@ -184,16 +189,31 @@ def test_build_shelf_groups_by_genre_in_curated_order() -> None:
         ],
         "M",
     )
-    assert [s.notation for s in sections] == ["HIS000000", "FIC000000"]
-    assert [len(s.spines) for s in sections] == [1, 2]
+    # Shelves sort alphabetically from A: "Fiction" before "History".
+    assert [s.notation for s in sections] == ["FIC000000", "HIS000000"]
+    assert [len(s.spines) for s in sections] == [2, 1]
 
 
 def test_build_shelf_gives_every_spine_its_geometry() -> None:
     sections = build_shelf([_row(height_mm=240, thickness_mm=40)], "L")
     spine = sections[0].spines[0]
-    assert spine.height_px == pytest.approx(300.0)
-    assert spine.width_px == pytest.approx(40 * 1.25)
+    assert spine.height_px == pytest.approx(400.0)
+    assert spine.width_px == pytest.approx(66.67)  # 40mm * 1.6667, rounded
     assert spine.lod == "full"
+
+
+def test_a_taller_than_standard_book_earns_air_above_it() -> None:
+    """A book taller than the preset defines the row height, plus a little air,
+    so its top does not sit flush on the back-panel edge."""
+    floor = ZOOM_ROW_PX["M"]
+    # A book shorter than the preset keeps the shelf at the standard height.
+    sections = build_shelf([_row(height_mm=200)], "M")
+    assert sections[0].row_px == pytest.approx(floor)
+    # A book taller than the preset grows the row to the book plus a margin.
+    sections = build_shelf([_row(height_mm=300)], "M")
+    tall = sections[0].spines[0].height_px
+    assert tall > floor
+    assert sections[0].row_px == pytest.approx(tall + TALL_BOOK_MARGIN_PX)
 
 
 def test_badge_trims_whole_numbers_but_keeps_decimals() -> None:

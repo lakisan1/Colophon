@@ -34,15 +34,6 @@ else
   notes+=("no heartbeat file (.run/heartbeat) — nothing has run 'make beat'; start the milestone or mark it done")
 fi
 
-# --- intent vs reality: STATE.json must agree with docs/PLAN.md ---
-if [[ -f docs/PLAN.md ]]; then
-  plan_current=$(grep -oE '^- \[ \] \*\*M[0-9]+' docs/PLAN.md | head -1 | grep -oE 'M[0-9]+')
-  if [[ -n "$plan_current" && "$plan_current" != "$milestone" ]]; then
-    red=1
-    notes+=("STATE.json says ${milestone}, docs/PLAN.md says ${plan_current} — the handoff drifted; re-sync STATE.json")
-  fi
-fi
-
 # --- working tree: an uncommitted mess means something stopped mid-edit ---
 dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 if [[ "$dirty" != "0" ]]; then

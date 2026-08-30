@@ -1,40 +1,49 @@
-<!doctype html>
-{# Root shell of every page. data-theme drives light/dark tokens (theme.css);
-   the user-facing theme switcher arrives with settings in M5. #}
-<html lang="en" data-theme="{{ theme | default('light', true) }}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}{{ page_title | default('Colophon', true) }}{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/theme.css">
-    {% block head %}{% endblock %}
-  </head>
-  <body>
-    {# D11: while the seeded password is still in use this banner shows, cannot be
-       dismissed, and links to Settings. It warns; it never blocks data entry. #}
-    {% if request is defined and request.state.colophon_default_credentials is defined and request.state.colophon_default_credentials %}
-      <p class="default-credentials" role="status">
-        You are still using the default password.
-        <a href="/settings">Change it in Settings</a>.
-      </p>
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme | default("light", true) }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Colophon{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/shell.css">
+  <link rel="stylesheet" href="/static/css/searchable.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <a class="site-title" href="/">Colophon</a>
+    {% if user is defined and user %}
+      <button class="site-nav-toggle btn" type="button" data-nav-toggle aria-expanded="false">Menu</button>
+      <nav class="site-nav" aria-label="Shelves">
+        <a href="/{% if filter_query %}?{{ filter_query }}{% endif %}"
+           {% if active_nav == "library" %}class="active" aria-current="page"{% endif %}>My library</a>
+        <a href="/borrowed{% if filter_query %}?{{ filter_query }}{% endif %}"
+           {% if active_nav == "borrowed" %}class="active" aria-current="page"{% endif %}>Borrowed</a>
+        <a href="/gone{% if filter_query %}?{{ filter_query }}{% endif %}"
+           {% if active_nav == "gone" %}class="active" aria-current="page"{% endif %}>Gone</a>
+        <a href="/wishlist{% if filter_query %}?{{ filter_query }}{% endif %}"
+           {% if active_nav == "wishlist" %}class="active" aria-current="page"{% endif %}>Wishlist</a>
+        <a href="/stats{% if filter_query %}?{{ filter_query }}{% endif %}"
+           {% if active_nav == "stats" %}class="active" aria-current="page"{% endif %}>Stats</a>
+        <a href="/settings"
+           {% if active_nav == "settings" %}class="active" aria-current="page"{% endif %}>Settings</a>
+      </nav>
+      <a class="btn btn-primary" href="/book/new">New book</a>
     {% endif %}
-    <header class="site-header">
-      <a class="site-title" href="/">Colophon</a>
-      {% if user is defined and user %}
-        <span class="site-user">
-          {{ user.username }}
-          <a class="site-link" href="/settings">Settings</a>
-          <form class="site-logout" method="post" action="/logout">
-            <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
-            <button type="submit" class="site-link-btn">Sign out</button>
-          </form>
-        </span>
-      {% endif %}
-    </header>
-    <main class="site-main">
-      {% block content %}
-      <p class="placeholder">{{ placeholder | default('Colophon scaffold is running.', true) }}</p>
-      {% endblock %}
-    </main>
-  </body>
+  </header>
+
+  {% if request is defined and request.state.colophon_default_credentials is defined and request.state.colophon_default_credentials %}
+    <div class="banner" role="status">
+      <span>You are still using the default password. Change it in <a href="/settings">Settings</a>.</span>
+      <button type="button" data-banner-dismiss aria-label="Dismiss">&times;</button>
+    </div>
+  {% endif %}
+
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/js/shell.js"></script>
+  <script src="/static/js/searchable.js"></script>
+</body>
 </html>

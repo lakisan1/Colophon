@@ -73,7 +73,7 @@ def page_context(
     """The full context for a template: the common keys plus this page's own.
 
     Routers pass everything specific to the page (`book`, `rows`, `sections`,
-    `errors`, …) as keyword arguments; everything base.html and _nav.html expect
+    `errors`, …) as keyword arguments; everything the base template expects
     comes from here, so there is no second place a router could set `theme`
     wrongly. `active_shelf` is the name the shelf nav partial uses and travels
     as an alias of `active_nav` so templates stay untouched.

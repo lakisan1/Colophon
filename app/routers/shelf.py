@@ -33,6 +33,8 @@ from app.shelf_store import (
     gone_rows,
     room_options,
     shelf_rows,
+    tag_options,
+    year_options,
 )
 from app.stats import dashboard
 from app.templating import templates
@@ -51,11 +53,40 @@ def shelf_page(
 ) -> HTMLResponse:
     chosen = _resolve_zoom(request, session, user.id, zoom)
     filters = parse_filters(request.query_params, scope="library")
-    sections = build_shelf(shelf_rows(session, user.id, filters), chosen)
+
+    # After adding a book the form redirects here with a flag; turn that into a
+    # clear "Saved." confirmation instead of a bare redirect back to the shelf.
+    notice = None
+    if request.query_params.get("saved") == "1":
+        notice = "Saved."
+        if request.query_params.get("duplicate") == "1":
+            notice += " It looked like a duplicate of a book already on the shelf."
+
+    # The library search can also cover the gone (sold+gifted) or borrowed
+    # shelf via the `status` filter; each shelf has its own row shape and
+    # template, so switch to those when selected.
+    # A global search (the "Also search gone & borrowed" checkbox) shows every
+    # book as a spine, whatever its shelf, instead of switching to a table.
+    if filters.search_all:
+        sections = build_shelf(shelf_rows(session, user.id, filters), chosen)
+        rows = None
+        template = "shelf.html"
+    elif filters.status == "gone":
+        rows = gone_rows(session, user.id, filters)
+        template = "gone.html"
+        sections = None
+    elif filters.status == "borrowed":
+        rows = borrowed_rows(session, user.id, filters)
+        template = "borrowed.html"
+        sections = None
+    else:
+        sections = build_shelf(shelf_rows(session, user.id, filters), chosen)
+        rows = None
+        template = "shelf.html"
 
     return templates.TemplateResponse(
         request,
-        "shelf.html",
+        template,
         _context(
             request,
             session,
@@ -63,9 +94,11 @@ def shelf_page(
             filters=filters,
             zoom=chosen,
             sections=sections,
+            rows=rows,
             active_nav="library",
             page_title="Colophon — My library",
             shelf_path="/",
+            notice=notice,
         ),
     )
 
@@ -146,55 +179,13 @@ def gone_page(
     )
 
 
-@router.get("/search", response_class=HTMLResponse)
-def search_page(
-    request: Request,
-    user: Annotated[CurrentUser, Depends(current_user)],
-    session: Annotated[Session, Depends(get_session)],
-    all_shelves: Annotated[str | None, Query(alias="all", max_length=4)] = None,
-    zoom: Annotated[str | None, Query(max_length=8)] = None,
-) -> HTMLResponse:
-    """Search the library and the wishlist.
-
-    SPEC §3: shelves 2 and 3 (borrowed, gone) join in only through an explicit
-    toggle, off by default — a hit pointing at a book you no longer have is noise
-    unless you asked for it.
-    """
-    chosen = _resolve_zoom(request, session, user.id, zoom)
-    include_all = (all_shelves or "").strip() in ("1", "true", "on")
-    scope = "search_all" if include_all else "search"
-    filters = parse_filters(request.query_params, scope=scope)
-
-    # No query and no filters means an empty result set rather than "everything",
-    # so the page never pretends a blank box is a search.
-    rows = shelf_rows(session, user.id, filters) if (filters.q or filters.is_active()) else []
-    sections = build_shelf(rows, chosen)
-
-    return templates.TemplateResponse(
-        request,
-        "search.html",
-        _context(
-            request,
-            session,
-            user,
-            filters=filters,
-            zoom=chosen,
-            sections=sections,
-            active_nav="search",
-            page_title="Colophon — Search",
-            shelf_path="/search",
-            include_all=include_all,
-            searched=bool(filters.q),
-        ),
-    )
-
-
 @router.get("/stats", response_class=HTMLResponse)
 def stats_page(
     request: Request,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
 ) -> HTMLResponse:
+    stats = dashboard(session, user.id)
     return templates.TemplateResponse(
         request,
         "stats.html",
@@ -203,7 +194,8 @@ def stats_page(
             user,
             page_title="Colophon — Statistics",
             active_nav="stats",
-            stats=dashboard(session, user.id),
+            stats=stats,
+            value_text=format_price(stats.value, page_prefs(request).currency_symbol or "€"),
             reading_states=READING_STATES,
         ),
     )
@@ -251,6 +243,7 @@ def _context(
     rows: list[dict] | None = None,
     include_all: bool = False,
     searched: bool = False,
+    notice: str | None = None,
 ) -> dict:
     """The shelf pages' own keys, merged over the common ones from page_context."""
     context = page_context(
@@ -272,9 +265,12 @@ def _context(
         reading_states=READING_STATES,
         rooms=room_options(session, user.id),
         authors=author_options(session, user.id),
+        tags=tag_options(session, user.id),
         genres=genre_options(session, user.id),
+        years=year_options(session, user.id),
         include_all=include_all,
         searched=searched,
+        notice=notice,
     )
     if zoom is not None:
         # A shelf page renders with the zoom resolved for *this* request (query
