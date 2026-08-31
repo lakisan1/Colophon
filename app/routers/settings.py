@@ -26,8 +26,8 @@ from app.auth import (
 from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.forms import read_form
-from app.lookup import PROVIDERS, provider_has_server_key
-from app.page import load_prefs_into_state, page_context, page_prefs
+from app.lookup import PROVIDERS
+from app.page import load_prefs_into_state, page_context
 from app.shelf import ZOOM_ROW_PX
 from app.templating import templates
 
@@ -78,16 +78,15 @@ async def update_settings(
 
     # A keyed provider takes one password input per registry id, so a provider
     # added to app/lookup.py gets its own key field without a column, a migration or
-    # a line here. An empty input stores no key — which means "use the server's",
-    # not "use an empty one", so blanks are dropped rather than saved.
+    # a line here. The reader's own key is the only key there is: an empty input
+    # stores no key rather than an empty one, and a keyed provider enabled without a
+    # key is a mistake on this form rather than a provider that silently answers
+    # nothing, so it is refused below instead of saved.
     provider_keys = {
         spec.id: (values.get(f"provider_key_{spec.id}") or "").strip()
         for spec in PROVIDERS
         if spec.needs_key
     }
-    provider_keys_json = json.dumps(
-        {pid: key for pid, key in provider_keys.items() if key}, separators=(",", ":")
-    )
 
     if theme not in THEMES:
         errors.append(f"Theme must be one of: {', '.join(THEMES)}.")
@@ -99,10 +98,21 @@ async def update_settings(
         errors.append(f"Time format must be one of: {', '.join(TIME_FORMATS)}.")
     if not currency or len(currency) > 4:
         errors.append("Currency symbol must be one to four characters.")
+    # Registry-driven, so a new keyed provider is validated the moment it is
+    # registered: enabled without a key is a dead checkbox, and a dead checkbox
+    # reads as "the search is broken" rather than "you still owe me a key".
+    for spec in PROVIDERS:
+        if spec.needs_key and spec.id in enabled and not provider_keys.get(spec.id):
+            errors.append(f"{spec.label} is enabled, but you must enter an API key to use it.")
 
     if errors:
         return _render(request, session, user, notice=None, errors=errors)
 
+    # Only a valid form is written: blank keys are dropped rather than stored, so an
+    # absent entry means "no key" in the column rather than a key of "".
+    provider_keys_json = json.dumps(
+        {pid: key for pid, key in provider_keys.items() if key}, separators=(",", ":")
+    )
     _upsert_prefs(
         session,
         user.id,
@@ -313,18 +323,6 @@ def _render(
     if user.is_admin and users is None:
         users = _users_for_admin(session)
     users = users if user.is_admin else []
-    # A keyed provider the reader enabled but cannot use (no personal key and no
-    # server key) is listed under the checkboxes so the search is never silently
-    # empty. `prefs` is the cached per-request preference, one of the shared keys.
-    prefs = page_prefs(request)
-    missing_provider_keys = [
-        spec.label
-        for spec in PROVIDERS
-        if spec.needs_key
-        and spec.id in prefs.search_providers
-        and not prefs.provider_keys.get(spec.id)
-        and not provider_has_server_key(spec.id)
-    ]
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -338,10 +336,9 @@ def _render(
             date_formats=DATE_FORMATS,
             time_formats=TIME_FORMATS,
             default_credentials=uses_default_credentials(session, user.id),
-            # The Search providers card is the registry rendered; the key flag only
-            # decides whether the hint under it shows.
+            # The Search providers card is the registry rendered: one checkbox per
+            # provider, plus a key field for every provider that needs one.
             providers=PROVIDERS,
-            missing_provider_keys=missing_provider_keys,
             users=users,
             admin_username=admin_username,
         ),

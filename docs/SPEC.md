@@ -126,8 +126,9 @@ Shelf organisation: sections **by genre**; within a section, sort by **series nu
 
 ## 7. Covers, metadata lookup, images
 
-- Lookup by **ISBN or title**: OpenLibrary is the default; Google Books sits behind the
-  optional `GOOGLE_BOOKS_KEY` env var and the app works fully without it (T5). Lookup
+- Lookup by **ISBN or title**: OpenLibrary is the default and needs no key; Google Books and
+  ISBNdb are keyed **per reader** — each reader pastes their own key in Settings, and a keyed
+  provider cannot be enabled without one (no server-side key env var exists). Lookup
   results are cached server-side together with the raw provider payload (T5).
 - The best cover is picked automatically; fully manual entry of every field is always
   possible.

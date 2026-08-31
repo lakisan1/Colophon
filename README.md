@@ -114,8 +114,10 @@ All variables are optional in development:
 | `COLOPHON_DB_PATH` | SQLite file path (default `data/colophon.sqlite3`) |
 | `COLOPHON_UPLOAD_DIR` | Uploaded photos directory (default `data/photos/`) |
 | `COLOPHON_DEV_AUTH_BYPASS` | `1` skips login — development only |
-| `GOOGLE_BOOKS_KEY` | Optional Google Books lookup key; the app works fully without it |
-| `ISBNDB_API_KEY` | Optional ISBNdb v2 lookup key; the app works fully without it |
+
+Search keys are **per reader, not per install**: Open Library needs no key, while Google Books and
+ISBNdb are keyed with each reader's own key, pasted in **Settings → Search providers**. There is no
+server-side key env var, and enabling a keyed provider without its key is refused on that page.
 
 ## 🧱 Tech
 

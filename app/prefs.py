@@ -26,8 +26,9 @@ DEFAULTS = {
     # Open Library needs no key and no configuration, so it is the provider
     # everybody gets; anything else is opted into on the settings page.
     "search_providers": "openlibrary",
-    # A JSON object of provider id -> key, empty by default: the server's own
-    # environment key is what a reader without one falls back to.
+    # A JSON object of provider id -> key, empty by default. Keys are per reader and
+    # there is no server key behind them, so a reader with no key of their own simply
+    # gets no keyed provider.
     "provider_keys": "",
 }
 

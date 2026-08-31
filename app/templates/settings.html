@@ -55,24 +55,21 @@
 
       <fieldset>
         <legend>Search providers</legend>
+        {# One row per provider in the app/lookup.py registry: a checkbox, plus a
+           key field for a provider that needs one. Keys are yours alone — there is
+           no server key — so enabling a keyed provider without one is refused. #}
         {% for provider in providers %}
           <label class="check field-wide">
             <input type="checkbox" name="provider_{{ provider.id }}" value="1" {% if provider.id in prefs.search_providers %}checked{% endif %}>
             {{ provider.label }}
           </label>
           {% if provider.needs_key %}
-            <label class="field field-wide">
+            <label class="field provider-key field-wide">
               <span class="label">{{ provider.label }} API key</span>
-              <input type="password" name="provider_key_{{ provider.id }}" value="{{ prefs.provider_keys.get(provider.id, '') }}" autocomplete="off" placeholder="optional — falls back to the server key">
+              <input type="password" name="provider_key_{{ provider.id }}" value="{{ prefs.provider_keys.get(provider.id, '') }}" autocomplete="off" placeholder="enter your API key">
             </label>
           {% endif %}
         {% endfor %}
-        {% if missing_provider_keys %}
-          <p class="hint">
-            {{ missing_provider_keys | join(", ") }} {{ "is" if missing_provider_keys | length == 1 else "are" }}
-            enabled, but no API key is set (paste one above, or set the matching server env var), so it won't return anything.
-          </p>
-        {% endif %}
       </fieldset>
 
       <p class="form-actions"><button type="submit" class="btn btn-primary">Save settings</button></p>

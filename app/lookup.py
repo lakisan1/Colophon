@@ -1,8 +1,9 @@
 # Book metadata lookup (M4). Providers live in the PROVIDERS registry below:
 # Open Library is on for everyone, Google Books and ISBNdb are opted into per user
-# on the settings page. A keyed provider is answered with the reader's own key when
-# they pasted one in Settings, and with the server's own environment key otherwise
-# (GOOGLE_BOOKS_KEY, ISBNDB_API_KEY — one per provider in app/settings.py).
+# on the settings page. Keys are per-user only — a keyed provider is answered with
+# the key that reader pasted in Settings (their own settings row, provider_keys) and
+# with nothing else. There is no server-side key, so a provider nobody configured
+# stays out of the search rather than borrowing somebody else's quota.
 #
 # Two rules shape this module. First: a provider call never raises — a network
 # timeout must not turn into a 500 page, so failures come back as LookupResult.error
@@ -18,7 +19,6 @@ from urllib.parse import quote
 import httpx
 
 from app.isbn import normalize_isbn
-from app.settings import settings
 
 OPEN_LIBRARY_SEARCH = "https://openlibrary.org/search.json"
 GOOGLE_BOOKS_SEARCH = "https://www.googleapis.com/books/v1/volumes"
@@ -60,26 +60,6 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 PROVIDER_ORDER = [spec.id for spec in PROVIDERS]
 PROVIDER_LABELS = {spec.id: spec.label for spec in PROVIDERS}
 _PROVIDERS_BY_ID = {spec.id: spec for spec in PROVIDERS}
-
-
-def _provider_key(provider_id: str) -> str | None:
-    """The server-side API key a needs_key provider falls back to, when configured.
-
-    A server key lives in app/settings.py (one environment variable per provider).
-    The reader's own key — prefs.provider_keys, resolved by search() — wins over
-    it; this function is only asked what the installation itself can offer.
-    """
-    if provider_id == "googlebooks":
-        return settings.google_books_key
-    if provider_id == "isbndb":
-        return settings.isbndb_api_key
-    return None
-
-
-def provider_has_server_key(provider_id: str) -> bool:
-    """Whether a provider has a server-side env key configured, so the settings
-    page can warn about an enabled keyed provider that cannot actually answer."""
-    return bool(_provider_key(provider_id))
 
 
 @dataclass(frozen=True)
@@ -133,8 +113,9 @@ def search(
     empty set calls nobody — no candidates and no error, because nothing failed.
 
     `provider_keys` is the reader's own keys (provider id -> key, from their
-    settings row). A key there is used for that provider; with none, the server's
-    environment key is the fallback, and with neither the provider is skipped.
+    settings row) and the only source of one: a keyed provider is asked only when a
+    non-empty key sits there. Without it the provider is skipped, not failed — a
+    preference the reader never finished configuring is not a network error.
     """
     raw = (query or "").strip()
     if not raw:
@@ -150,12 +131,11 @@ def search(
         query_func = _QUERY_FUNCS.get(provider_id)
         if query_func is None:  # registered without a query function: nobody to ask
             continue
-        # The reader's own key first, the server's as fallback; needs_key with
-        # neither is enabled but unusable, so this provider stays silent instead of
+        # The reader's own key is the only key there is, so needs_key without one
+        # means enabled-but-unconfigured: this provider stays silent instead of
         # failing every search it takes part in.
         user_key = (provider_keys or {}).get(provider_id, "").strip()
-        usable = bool(user_key) or bool(_provider_key(provider_id))
-        if _PROVIDERS_BY_ID[provider_id].needs_key and not usable:
+        if _PROVIDERS_BY_ID[provider_id].needs_key and not user_key:
             continue
         try:
             result.candidates += query_func(raw, isbn, limit, user_key or None)
@@ -247,10 +227,11 @@ def _candidate_from_ol(document: dict) -> Candidate | None:
 def _google_books(
     raw: str, isbn: str | None, limit: int, provider_key: str | None = None
 ) -> list[Candidate]:
-    # The reader's own key when they pasted one in Settings, else the server's.
+    # search() only calls this provider with the reader's own key, so there is
+    # nothing to fall back to and nothing else that can be sent.
     params: dict[str, str | int] = {
         "maxResults": limit,
-        "key": provider_key or settings.google_books_key,
+        "key": provider_key,
     }
     # Same rule as Open Library: an ISBN is searched exactly, anything else is
     # the free-text title/author query.
@@ -299,9 +280,10 @@ def _google_books(
 def _isbndb_book(
     raw: str, isbn: str | None, limit: int, provider_key: str | None = None
 ) -> list[Candidate]:
-    # ISBNdb authenticates with the reader's own key (else the server's) in an
-    # Authorization header, sent raw: no "Bearer" scheme in front of it.
-    headers = {"User-Agent": USER_AGENT, "Authorization": provider_key or settings.isbndb_api_key}
+    # ISBNdb authenticates with the reader's own key in an Authorization header,
+    # sent raw: no "Bearer" scheme in front of it. search() supplies that key or it
+    # does not call this provider at all.
+    headers = {"User-Agent": USER_AGENT, "Authorization": provider_key}
     # The search term is a path segment rather than a query parameter, so it is
     # percent-encoded here; an ISBN is already URL-safe and gets the edition
     # endpoint, which takes no pageSize.

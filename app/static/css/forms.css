@@ -72,11 +72,26 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
+/* A ticked box is painted, not typed into: the accent colour is the theme's focus
+   ring, so it matches the rest of the palette on paper and on the dark theme alike
+   instead of the browser's stock blue. The padding and border above size text
+   fields; on a 1rem control they read as a sunken box rather than a tick. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--focus-ring, #b3541e);
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+/* Checkbox text is the same size as the input text in this grid (0.88rem), so a
+   ticked label reads as a control rather than as its caption. */
 .check {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
+  gap: 0.45rem;
+  font-size: 0.88rem;
 }
 
 .btn {
@@ -111,6 +126,14 @@ textarea:focus-visible {
 .errors { background: color-mix(in srgb, var(--cloth-crimson) 22%, var(--paper)); }
 
 .hint { font-size: 0.78rem; color: var(--ink-muted); }
+
+/* ---------- settings: search providers ----------
+ * One provider is one row of the fieldset grid: the checkbox spans the row, and a
+ * keyed provider's key field spans the row beneath it, indented by the width of a
+ * checkbox so the pair reads as one provider. Both are field-wide, so the card
+ * lines up with the labelled fields in the Display card above it. */
+.check.field-wide { min-height: 1.5rem; }
+.field.provider-key { margin-left: 1.45rem; }
 
 /* Admin: user-management list. */
 .user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }

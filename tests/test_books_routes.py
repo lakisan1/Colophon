@@ -180,10 +180,13 @@ def _demo_owner(engine) -> int:
         return int(conn.execute(text("SELECT id FROM users WHERE username = 'demo'")).scalar_one())
 
 
-def test_google_books_shows_in_search_when_enabled(
-    seeded_db, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    client, engine = seeded_db
+def _set_demo_provider_prefs(engine, search_providers: str, provider_keys: str) -> None:
+    """Put the demo reader's provider choice and personal keys on their own row.
+
+    Keys are per-user — there is no server key for a test to hand the app — so the
+    key that makes Google Books answerable lives in the same row as the checkbox
+    that opts into it, exactly where /settings writes it.
+    """
     owner = _demo_owner(engine)
     with engine.begin() as conn:
         row = conn.execute(
@@ -191,28 +194,40 @@ def test_google_books_shows_in_search_when_enabled(
         ).first()
         if row:
             conn.execute(
-                text("UPDATE settings SET search_providers = :p WHERE owner_id = :o"),
-                {"p": "openlibrary,googlebooks", "o": owner},
+                text(
+                    "UPDATE settings SET search_providers = :p, provider_keys = :k"
+                    " WHERE owner_id = :o"
+                ),
+                {"p": search_providers, "k": provider_keys, "o": owner},
             )
         else:
             conn.execute(
-                text("INSERT INTO settings (owner_id, search_providers) VALUES (:o, :p)"),
-                {"p": "openlibrary,googlebooks", "o": owner},
+                text(
+                    "INSERT INTO settings (owner_id, search_providers, provider_keys)"
+                    " VALUES (:o, :p, :k)"
+                ),
+                {"o": owner, "p": search_providers, "k": provider_keys},
             )
-    monkeypatch.setattr(settings, "google_books_key", "test-key")
+
+
+def test_google_books_shows_in_search_when_enabled(
+    seeded_db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, engine = seeded_db
+    _set_demo_provider_prefs(engine, "openlibrary,googlebooks", '{"googlebooks":"test-key"}')
     _install_mixed_lookup(monkeypatch)
 
     html = client.get("/book/new", params={"q": "tales"}).text
 
     assert "Tales of the Shelf" in html  # Open Library result
-    assert "Tales of the Google" in html  # Google Books result, opted in
+    assert "Tales of the Google" in html  # Google Books result, opted in with their own key
 
 
 def test_google_books_is_absent_by_default(seeded_db, monkeypatch: pytest.MonkeyPatch) -> None:
-    # search_providers stays at its 'openlibrary' default even though a key is
-    # configured: the key makes Google Books possible, the preference makes it asked.
-    client, _engine = seeded_db
-    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    # search_providers stays at its 'openlibrary' default even though this reader has
+    # a key stored: the key makes Google Books possible, the preference makes it asked.
+    client, engine = seeded_db
+    _set_demo_provider_prefs(engine, "openlibrary", '{"googlebooks":"test-key"}')
     _install_mixed_lookup(monkeypatch)
 
     html = client.get("/book/new", params={"q": "tales"}).text

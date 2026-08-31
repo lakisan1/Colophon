@@ -43,7 +43,7 @@ Every entry was decided by Lazar (2027-08-27) or is a documented assumption by t
 | T2 | DB | SQLite, one file, WAL mode. Single uvicorn worker (in-memory rate limiter + SQLite writes both need this). |
 | T3 | Migrations | Alembic, `upgrade head` at container start. |
 | T4 | Deps | Pinned `requirements.txt`, `.venv` in the project, Python 3.12. |
-| T5 | Lookup | OpenLibrary default. Google Books behind an optional `GOOGLE_BOOKS_KEY` env var — the app works fully without it. Lookup results cached server-side with the raw provider payload. |
+| T5 | Lookup | OpenLibrary default. ~~Google Books behind an optional `GOOGLE_BOOKS_KEY` env var~~ **Superseded:** search keys are per reader, never per install — Google Books and ISBNdb use the reader's own key from /settings, there is no server-side env key, and a keyed provider cannot be enabled without one. Lookup results cached server-side with the raw provider payload. |
 | T6 | Images | Downloaded covers stored locally (never hotlinked). Uploaded photos stored per copy/slot with generated filenames. Provider cover and user photo are **separate columns** — a re-lookup never overwrites a user's photo. |
 | T7 | EXIF | Stripped server-side on upload via Pillow. Re-encoded to WebP, max 1600px, `X-Content-Type-Options: nosniff` when served. |
 | T8 | Auth | bcrypt, DB-backed sessions, 30-day sliding expiry with a 90-day hard cap, CSRF tokens on every mutation, rate limit keyed on IP **and** username, CLI unlock script (`python -m app.tools.unlock`). |
