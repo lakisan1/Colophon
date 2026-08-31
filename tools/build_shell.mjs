@@ -19,6 +19,14 @@ const shellCss = `
 /* Shared app chrome. Uses the theme tokens from theme.css, so every page
    tracks light/dark via the <html data-theme="..."> attribute. */
 
+/* Never let the whole page scroll sideways on phones/tablets — wide content
+   (e.g. a long shelf of books) should scroll inside its own container. Use
+   overflow-x: clip rather than hidden: overflow-x: hidden makes the body a
+   scroll container, which breaks position: sticky on the header. */
+html, body {
+  overflow-x: clip;
+}
+
 /* --- layout ------------------------------------------------------------- */
 .site-header {
   position: sticky;
@@ -208,8 +216,15 @@ const shellCss = `
 .stack { display: grid; gap: 1rem; }
 .row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
+/* The "Menu" button is only for narrow screens. On a wide viewport the nav is
+   always visible, so the toggle must disappear; the max-width block below
+   brings it back. Placed after .btn so it overrides the button's display.
+   Scoped under .site-header (higher specificity than a bare .btn) so a later
+   stylesheet — e.g. forms.css redefining .btn's display — can't resurrect it. */
+.site-header .site-nav-toggle { display: none; }
+
 @media (max-width: 640px) {
-  .site-nav-toggle { display: inline-flex; }
+  .site-header .site-nav-toggle { display: inline-flex; }
   .site-nav {
     display: none;
     width: 100%;

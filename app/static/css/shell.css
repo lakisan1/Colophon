@@ -155,8 +155,10 @@ html, body {
 
 /* The "Menu" button is only for narrow screens. On a wide viewport the nav is
    always visible, so the toggle must disappear; the max-width block below
-   brings it back. Placed after .btn so it overrides the button's display. */
-.site-nav-toggle { display: none; }
+   brings it back. Placed after .btn so it overrides the button's display.
+   Scoped under .site-header (higher specificity than a bare .btn) so a later
+   stylesheet — e.g. forms.css redefining .btn's display — can't resurrect it. */
+.site-header .site-nav-toggle { display: none; }
 
 /* --- banner ------------------------------------------------------------- */
 .banner {
@@ -204,7 +206,7 @@ html, body {
 .row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
 @media (max-width: 640px) {
-  .site-nav-toggle { display: inline-flex; }
+  .site-header .site-nav-toggle { display: inline-flex; }
   .site-nav {
     display: none;
     width: 100%;
