@@ -127,6 +127,96 @@ def test_book_lookup_reports_not_found_for_an_unknown_isbn(
     assert response.json() == {"found": False}
 
 
+def _google_payload() -> dict:
+    return {
+        "items": [
+            {
+                "id": "gb1",
+                "volumeInfo": {
+                    "title": "Tales of the Google",
+                    "authors": ["G. B. Author"],
+                    "publisher": "GBCo",
+                    "publishedDate": "2001-01-01",
+                    "pageCount": 200,
+                    "language": "en",
+                    "industryIdentifiers": [{"type": "ISBN_10", "identifier": "0441478123"}],
+                    "imageLinks": {"thumbnail": "https://books.example/thumb.jpg"},
+                },
+            }
+        ]
+    }
+
+
+def _mixed_lookup_handler(request: httpx.Request) -> httpx.Response:
+    # OL for the default search host, Google for its own API host.
+    if "googleapis" in request.url.host:
+        return httpx.Response(200, json=_google_payload())
+    return httpx.Response(
+        200,
+        json={
+            "docs": [
+                {
+                    "key": "/works/OL1",
+                    "title": "Tales of the Shelf",
+                    "author_name": ["A. Author"],
+                    "publish_year": [2001],
+                    "num_pages": [210],
+                }
+            ]
+        },
+    )
+
+
+def _install_mixed_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        lookup_module,
+        "CLIENT_FACTORY",
+        lambda **kw: httpx.Client(transport=httpx.MockTransport(_mixed_lookup_handler), **kw),
+    )
+
+
+def _demo_owner(engine) -> int:
+    with engine.connect() as conn:
+        return int(conn.execute(text("SELECT id FROM users WHERE username = 'demo'")).scalar_one())
+
+
+def test_google_books_shows_in_search_when_enabled(
+    seeded_db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, engine = seeded_db
+    owner = _demo_owner(engine)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM settings WHERE owner_id = :o"), {"o": owner}
+        ).first()
+        if row:
+            conn.execute(
+                text("UPDATE settings SET google_books = 1 WHERE owner_id = :o"), {"o": owner}
+            )
+        else:
+            conn.execute(
+                text("INSERT INTO settings (owner_id, google_books) VALUES (:o, 1)"), {"o": owner}
+            )
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    _install_mixed_lookup(monkeypatch)
+
+    html = client.get("/book/new", params={"q": "tales"}).text
+
+    assert "Tales of the Shelf" in html  # Open Library result
+    assert "Tales of the Google" in html  # Google Books result, opted in
+
+
+def test_google_books_is_absent_by_default(seeded_db, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _engine = seeded_db
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    _install_mixed_lookup(monkeypatch)
+
+    html = client.get("/book/new", params={"q": "tales"}).text
+
+    assert "Tales of the Shelf" in html
+    assert "Tales of the Google" not in html  # not opted in, so only Open Library
+
+
 def test_book_lookup_returns_not_found_for_an_empty_isbn(seeded_client: TestClient) -> None:
     response = seeded_client.get("/book/lookup")
 

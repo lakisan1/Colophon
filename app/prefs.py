@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.shelf import DEFAULT_ZOOM
 
 # Column order shared by the two lookups below.
-_COLUMNS = "currency_symbol, date_format, time_format, theme, zoom_preset"
+_COLUMNS = "currency_symbol, date_format, time_format, theme, zoom_preset, google_books"
 
 DEFAULTS = {
     "currency_symbol": "€",
@@ -20,6 +20,7 @@ DEFAULTS = {
     "time_format": "24h",
     "theme": "light",
     "zoom_preset": DEFAULT_ZOOM,
+    "google_books": 0,
 }
 
 
@@ -32,6 +33,7 @@ class Prefs:
     time_format: str
     theme: str
     zoom_preset: str
+    google_books: bool
 
 
 def load_prefs(session: Session, owner_id: int) -> Prefs:
@@ -43,6 +45,8 @@ def load_prefs(session: Session, owner_id: int) -> Prefs:
     values = {
         key: (value if value not in (None, "") else DEFAULTS[key]) for key, value in values.items()
     }
+    # The stored flag is 0/1 from SQLite; expose it as a real boolean.
+    values["google_books"] = bool(values.get("google_books"))
     return Prefs(**values)
 
 

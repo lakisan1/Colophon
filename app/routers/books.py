@@ -1046,7 +1046,11 @@ def _render_form(
         # warning asks about "Height 900 mm", so the field must show 900 —
         # otherwise the page confirms a value it does not display.
         values.update(outcome.values)
-    lookup = search(lookup_query) if lookup_query else None
+    lookup = (
+        search(lookup_query, include_google=page_prefs(request).google_books)
+        if lookup_query
+        else None
+    )
 
     # Messages travel as query flags on the redirect, so a browser refresh does
     # not replay a POST and does not re-show a stale banner.

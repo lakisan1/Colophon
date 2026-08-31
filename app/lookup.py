@@ -107,7 +107,10 @@ def _open_library(raw: str, isbn: str | None, limit: int) -> list[Candidate]:
     return candidates
 
 
-_OL_FIELDS = "key,title,subtitle,author_name,publisher,publish_year,num_pages,isbn,language,cover_i"
+_OL_FIELDS = (
+    "key,title,subtitle,author_name,publisher,publish_year,num_pages,"
+    "number_of_pages_median,isbn,language,cover_i"
+)
 
 
 def _candidate_from_ol(document: dict) -> Candidate | None:
@@ -149,7 +152,8 @@ def _candidate_from_ol(document: dict) -> Candidate | None:
         ],
         publisher=str((document.get("publisher") or [None])[0] or "").strip()[:200] or None,
         published_year=_first_int(document.get("publish_year")),
-        page_count=_first_int(document.get("num_pages")),
+        page_count=_first_int(document.get("num_pages"))
+        or _first_int(document.get("number_of_pages_median")),
         isbn=isbn,
         language=_first_language(document.get("language")),
         covers=tuple(covers),
@@ -200,6 +204,10 @@ def _google_books(raw: str, limit: int) -> list[Candidate]:
 
 
 def _first_int(values) -> int | None:
+    # OL returns some of these as a bare integer (num_pages, number_of_pages_median)
+    # and others as a list (publish_year); treat a scalar as a one-item list.
+    if isinstance(values, (int, str)):
+        values = [values]
     for value in values or []:
         try:
             return int(value)

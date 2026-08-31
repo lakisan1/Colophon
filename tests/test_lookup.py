@@ -105,6 +105,19 @@ def test_open_library_document_becomes_a_candidate(monkeypatch: pytest.MonkeyPat
     assert candidate.provider == "openlibrary"
 
 
+def test_open_library_page_count_falls_back_to_the_median(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # OL's /search.json serves number_of_pages_median, not num_pages; the page
+    # count must still be filled from it rather than left blank.
+    document = {"key": "/works/OL2", "title": "No Pages Field", "number_of_pages_median": 480}
+    _install(monkeypatch, lambda request: httpx.Response(200, json={"docs": [document]}))
+
+    candidate = search("No Pages Field").candidates[0]
+
+    assert candidate.page_count == 480
+
+
 def test_cover_candidates_are_offered_large_first(monkeypatch: pytest.MonkeyPatch) -> None:
     _install(monkeypatch, lambda request: httpx.Response(200, json={"docs": [_OL_DOCUMENT]}))
     candidate = search("x").candidates[0]
