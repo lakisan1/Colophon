@@ -99,12 +99,20 @@ def load_prefs(session: Session, owner_id: int) -> Prefs:
     values = dict(DEFAULTS)
     values.update(_fetch(session, "WHERE owner_id IS NULL"))
     values.update(_fetch(session, "WHERE owner_id = :owner_id", {"owner_id": owner_id}))
-    # A NULL column means "not overridden", not "render nothing".
+    # A NULL column means "not overridden", not "render nothing" — except the
+    # provider list, where an empty string is the reader's own answer: every
+    # provider switched off. Only a column that was never written falls back.
     values = {
-        key: (value if value not in (None, "") else DEFAULTS[key]) for key, value in values.items()
+        key: (value if key == "search_providers" or value not in (None, "") else DEFAULTS[key])
+        for key, value in values.items()
     }
     # Comma-separated in the column, a set everywhere else (see parse_providers).
-    values["search_providers"] = parse_providers(values.get("search_providers"))
+    # An empty string parses to the empty set, which app/lookup.py answers with
+    # nobody called and the Add-book page says "Search is disabled" about.
+    raw = values.get("search_providers")
+    if raw is None:
+        raw = DEFAULTS["search_providers"]
+    values["search_providers"] = parse_providers(raw)
     # JSON object in the column, a dict everywhere else (see parse_provider_keys).
     values["provider_keys"] = parse_provider_keys(values.get("provider_keys"))
     return Prefs(**values)

@@ -38,6 +38,8 @@ A comprehensive, categorized list of every feature in Colophon. Add to it as the
   **Google Books** or **ISBNdb** to pre-fill the form — tick the keyed ones in Settings and paste **your own**
   API key there; keys are per reader with no server-side fallback, so a keyed provider cannot be enabled
   without one. Nothing saves until you press Save.
+- **Search is optional**: untick every provider in Settings (the form asks first) and the New book lookup
+  disables itself with a note pointing back to Settings, instead of pretending to search.
 - **Manual entry** with validation (ISBN format, year bounds, positive dimensions).
 - **Duplicate warning**: an ISBN or title you already own raises a heads-up but still saves.
 - **Oversize confirmation**: a dimension implausibly large for a book asks before saving.

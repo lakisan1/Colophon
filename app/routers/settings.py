@@ -70,10 +70,9 @@ async def update_settings(
     # One checkbox per provider, named after its registry id, so a provider added
     # to app/lookup.py appears here and is stored without touching this function.
     enabled = [spec.id for spec in PROVIDERS if values.get(f"provider_{spec.id}") == "1"]
-    if not enabled:
-        # Nothing ticked means a search that can never answer, which reads as a
-        # broken button rather than a preference — so Open Library stays on.
-        enabled = ["openlibrary"]
+    # Nothing ticked is stored as nothing enabled: a reader may switch search off
+    # altogether. The Add-book page then says so and disables the lookup, and
+    # search() with an empty set calls nobody rather than failing.
     search_providers = ",".join(enabled)
 
     # A keyed provider takes one password input per registry id, so a provider

@@ -26,6 +26,7 @@ from app.auth import (
 )
 from app.lookup import PROVIDERS
 from app.main import create_app
+from app.prefs import Prefs
 from app.settings import settings
 from tests.alembic_runner import engine_for, run_alembic
 
@@ -733,8 +734,15 @@ def test_a_personal_key_is_what_makes_the_provider_save(
     assert json.loads(_stored_provider_keys(auth_engine)) == {"googlebooks": "AIza-user-key"}
 
 
-def test_a_search_always_has_somebody_to_ask(auth_client: TestClient, auth_engine: Engine) -> None:
-    """No box ticked is not a preference for silence: Open Library stays on."""
+def test_every_search_provider_can_be_switched_off(
+    auth_client: TestClient, auth_engine: Engine
+) -> None:
+    """No box ticked is a preference now: the row stores nobody enabled.
+
+    The ask that used to be the server's floor ("Open Library stays on") is a
+    client-side confirm on the form, so a POST with nothing ticked — exactly what
+    a confirming browser sends — saves an empty provider list.
+    """
     sign_in(auth_client)
     token = _csrf_from(auth_client.get("/settings").text)
 
@@ -750,9 +758,172 @@ def test_a_search_always_has_somebody_to_ask(auth_client: TestClient, auth_engin
     assert opted_in.status_code == 200
     assert _stored_search_providers(auth_engine) == "googlebooks"
 
+    saved = auth_client.post("/settings", data={"csrf_token": token, **_SETTINGS_FIELDS})
+
+    assert saved.status_code == 200
+    assert "Saved." in saved.text
+    assert _stored_search_providers(auth_engine) == ""
+    page = auth_client.get("/settings")
+    for spec in PROVIDERS:
+        assert f'name="provider_{spec.id}" value="1" checked' not in page.text
+
+
+def test_all_off_still_refuses_a_keyed_provider_it_cannot_answer(
+    auth_client: TestClient, auth_engine: Engine
+) -> None:
+    """Switching everything off is allowed; a keyed provider with no key is not."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
+    refused = auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_isbndb": "1",
+            "provider_key_isbndb": "",
+        },
+    )
+
+    assert refused.status_code == 200
+    assert "ISBNdb is enabled, but you must enter an API key to use it." in refused.text
+    # All-off is allowed on the same form; a keyed box with no key still is not, and
+    # the refused write leaves the row exactly as the next (valid) save left it.
+    auth_client.post("/settings", data={"csrf_token": token, **_SETTINGS_FIELDS})
+    assert _stored_search_providers(auth_engine) == ""
+
+
+def test_an_empty_provider_list_disables_the_new_book_lookup(
+    auth_client: TestClient, auth_engine: Engine
+) -> None:
+    """The Add-book page says the lookup is off rather than returning no matches."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
     auth_client.post("/settings", data={"csrf_token": token, **_SETTINGS_FIELDS})
 
-    assert _stored_search_providers(auth_engine) == "openlibrary"
+    assert _stored_search_providers(auth_engine) == ""
+    page = auth_client.get("/book/new")
+
+    assert page.status_code == 200
+    assert "Search is disabled" in page.text
+    assert 'href="/settings">Settings</a>' in page.text
+    assert '<button type="submit" class="btn" disabled>Search</button>' in page.text
+    query = _lookup_input(page.text)
+    assert "disabled" in query
+    assert 'placeholder="ISBN or title"' in query
+
+
+def test_a_provider_on_keeps_the_new_book_lookup_live(auth_client: TestClient) -> None:
+    """The other half: with a provider enabled nothing on the card is disabled."""
+    sign_in(auth_client)
+
+    page = auth_client.get("/book/new")
+
+    assert page.status_code == 200
+    assert "Search is disabled" not in page.text
+    assert '<button type="submit" class="btn">Search</button>' in page.text
+    query = _lookup_input(page.text)
+    assert "disabled" not in query
+    assert 'placeholder="ISBN or title"' in query
+
+
+def _lookup_input(html: str) -> str:
+    """The lookup field's own tag, so a test can ask what it carries."""
+    import re
+
+    match = re.search('<input[^>]*name="q"[^>]*>', html)
+    assert match is not None, "the Add-book page must carry the lookup input"
+    return match.group(0)
+
+
+def _prefs_for(engine: Engine, owner_id: int) -> Prefs:
+    """Effective prefs straight from the resolution order, no HTTP in the way."""
+    from sqlalchemy.orm import sessionmaker
+
+    from app.prefs import load_prefs
+
+    with sessionmaker(bind=engine, expire_on_commit=False)() as session:
+        return load_prefs(session, owner_id)
+
+
+def _admin_id(engine: Engine) -> int:
+    with engine.connect() as conn:
+        return int(conn.execute(text("SELECT id FROM users WHERE username = 'admin'")).scalar_one())
+
+
+def _set_stored_providers(engine: Engine, owner_id: int, value: str) -> None:
+    """Write the reader's own provider column — "" is a writable, meaningful value."""
+    with engine.begin() as conn:
+        updated = conn.execute(
+            text("UPDATE settings SET search_providers = :p WHERE owner_id = :o"),
+            {"p": value, "o": owner_id},
+        )
+        if updated.rowcount == 0:
+            conn.execute(
+                text("INSERT INTO settings (owner_id, search_providers) VALUES (:o, :p)"),
+                {"o": owner_id, "p": value},
+            )
+
+
+def test_load_prefs_reads_an_empty_provider_list_as_nothing_enabled(
+    auth_engine: Engine,
+) -> None:
+    """An empty provider column is the reader's own decision, not a missing value."""
+    admin = _admin_id(auth_engine)
+    _set_stored_providers(auth_engine, admin, "")
+
+    assert _prefs_for(auth_engine, admin).search_providers == frozenset()
+
+
+def test_load_prefs_falls_back_only_for_a_reader_with_no_preference_of_their_own(
+    auth_engine: Engine,
+) -> None:
+    """No row of their own is still "no preference", which DEFAULTS answers.
+
+    The written-empty case above is the one that changed; this is the case that
+    did not, so the two together say "empty means off, absent means default".
+    """
+    admin = _admin_id(auth_engine)
+    with auth_engine.begin() as conn:
+        conn.execute(text("DELETE FROM settings WHERE owner_id = :o"), {"o": admin})
+
+    assert _prefs_for(auth_engine, admin).search_providers == frozenset({"openlibrary"})
+
+    _set_stored_providers(auth_engine, admin, "")
+    assert _prefs_for(auth_engine, admin).search_providers == frozenset()
+
+
+def test_the_settings_page_renders_what_the_registry_says_about_a_provider(
+    auth_client: TestClient,
+) -> None:
+    """A provider may describe itself; the card links it and links where to help."""
+    sign_in(auth_client)
+
+    page = auth_client.get("/settings")
+
+    about = '<a href="https://openlibrary.org" target="_blank" rel="noopener">'
+    contribute = '<a href="https://openlibrary.org/about" target="_blank" rel="noopener">'
+    assert about in page.text
+    assert "free &amp; open source</a>" in page.text
+    assert contribute + "Contribute</a>" in page.text
+    # A provider with nothing to say renders no note, so the count is the registry's.
+    with_a_note = [spec for spec in PROVIDERS if spec.description]
+    assert page.text.count('class="provider-note') == len(with_a_note)
+
+
+def test_the_settings_form_asks_before_switching_every_provider_off(
+    auth_client: TestClient,
+) -> None:
+    """The confirm is client-side, so the page must carry it."""
+    sign_in(auth_client)
+
+    page = auth_client.get("/settings")
+
+    assert "Are you sure you want to disable all search providers?" in page.text
+    assert "The New book lookup won't work." in page.text
+    assert 'input[name^="provider_"]:checked' in page.text
+    assert "preventDefault" in page.text
 
 
 def test_the_shelf_follows_the_stored_zoom(auth_client: TestClient) -> None:

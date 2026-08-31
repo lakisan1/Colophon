@@ -134,6 +134,17 @@ input[type="radio"] {
  * lines up with the labelled fields in the Display card above it. */
 .check.field-wide { min-height: 1.5rem; }
 .field.provider-key { margin-left: 1.45rem; }
+/* The registry's description link sits under its checkbox, indented the same way,
+   so one provider reads as one block: name, what it is, key. */
+.provider-note { margin-left: 1.45rem; }
+
+/* A lookup nobody can answer (every provider off) is disabled rather than hidden,
+   so it must still look like the button it is — just not a live one. */
+.btn:disabled,
+input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 /* Admin: user-management list. */
 .user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }

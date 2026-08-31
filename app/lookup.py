@@ -47,10 +47,22 @@ class ProviderSpec:
     id: str
     label: str
     needs_key: bool = False
+    # What the settings page shows under the checkbox: a one-line description and
+    # where to read more, plus where to help. Plain data on the registry entry, so
+    # a provider with nothing to say renders nothing.
+    description: str | None = None
+    url: str | None = None
+    contribute_url: str | None = None
 
 
 PROVIDERS: tuple[ProviderSpec, ...] = (
-    ProviderSpec("openlibrary", "Open Library"),
+    ProviderSpec(
+        "openlibrary",
+        "Open Library",
+        description="free & open source",
+        url="https://openlibrary.org",
+        contribute_url="https://openlibrary.org/about",
+    ),
     ProviderSpec("googlebooks", "Google Books", needs_key=True),
     ProviderSpec("isbndb", "ISBNdb", needs_key=True),
 )

@@ -26,14 +26,19 @@
     {% endif %}
 
     {# ---------------- provider lookup ---------------- #}
+    {# Every provider off is a preference a reader chose in Settings, so the lookup
+       says so and disables itself rather than looking like a broken button. #}
     <form class="card lookup-card" method="get" action="/book/new">
       <label class="field">
         <span class="label">Look it up</span>
         <input type="search" name="q" value="{{ lookup.query if lookup else '' }}"
-               placeholder="ISBN, or title and author" maxlength="200">
+               placeholder="ISBN or title" maxlength="200"{% if not prefs.search_providers %} disabled{% endif %}>
       </label>
-      <button type="submit" class="btn">Search</button>
+      <button type="submit" class="btn"{% if not prefs.search_providers %} disabled{% endif %}>Search</button>
     </form>
+    {% if not prefs.search_providers %}
+      <p class="hint">Search is disabled — enable a search provider in <a href="/settings">Settings</a>.</p>
+    {% endif %}
 
     {% if lookup %}
       <div class="lookup-results">
