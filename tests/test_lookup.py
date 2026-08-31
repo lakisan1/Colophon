@@ -392,6 +392,210 @@ def test_one_provider_being_down_does_not_silence_the_other(
     assert [candidate.provider for candidate in result.candidates] == ["googlebooks"]
 
 
+# --- ISBNdb: the third provider, keyed, registered exactly like the other two ---
+
+_ISBNDB_BOOK = {
+    "isbn13": "9780441018369",
+    "isbn10": "0441018369",
+    "title": "Leviathan Wakes",
+    "publisher": "Orbit",
+    "language": "en",
+    "date_published": "2011-08-16",
+    "pages": 592,
+    "overview": "Ignatius Reznikov finds the ring.",
+    "image": "https://isbndb.com/cover/9780441018369.jpg",
+    # A nameless author entry and a bare string are both junk the API really does
+    # return; neither may reach the form as an author.
+    "authors": [{"name": "James S.A. Corey"}, {"name": None}, "Martinez"],
+}
+
+
+def _isbndb_payload(request: httpx.Request) -> httpx.Response:
+    """One book from ISBNdb, empty answers from everybody else."""
+    if "isbndb" in request.url.host:
+        return httpx.Response(200, json={"total": 1, "results": [_ISBNDB_BOOK]})
+    return httpx.Response(200, json={"docs": []})
+
+
+def _isbndb_mixed_handler(request: httpx.Request) -> httpx.Response:
+    """The same title from Open Library and from ISBNdb, so each candidate's
+    provider records who answered it."""
+    if "isbndb" in request.url.host:
+        return httpx.Response(200, json={"total": 1, "results": [_ISBNDB_BOOK]})
+    return httpx.Response(200, json={"docs": [_OL_DOCUMENT]})
+
+
+def test_isbndb_is_registered_after_google_books() -> None:
+    # Settings renders this order and search() queries in it, so a candidate list
+    # built from all three providers always reads Open Library, Google Books, ISBNdb.
+    assert PROVIDER_ORDER == ["openlibrary", "googlebooks", "isbndb"]
+    assert PROVIDER_LABELS["isbndb"] == "ISBNdb"
+
+
+def test_an_isbn_query_hits_the_isbndb_book_endpoint_with_the_raw_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["host"] = request.url.host
+        seen["path"] = request.url.path
+        seen["auth"] = request.headers.get("Authorization", "")
+        seen["ua"] = request.headers.get("User-Agent", "")
+        return httpx.Response(200, json={"book": _ISBNDB_BOOK})
+
+    _install(monkeypatch, handler)
+    result = search("978-0441018369", providers=("isbndb",))
+
+    assert seen["host"] == "api2.isbndb.com"
+    assert seen["path"] == "/book/9780441018369"  # the normalised ISBN, as a path segment
+    # ISBNdb wants the key alone in Authorization — no "Bearer " scheme in front.
+    assert seen["auth"] == "test-key"
+    assert seen["ua"].startswith("Colophon/")
+    assert result.failed is False
+    assert [candidate.provider for candidate in result.candidates] == ["isbndb"]
+
+
+def test_a_title_query_hits_the_isbndb_books_path_with_a_page_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["url"] = str(request.url)
+        seen["page_size"] = request.url.params.get("pageSize", "")
+        return httpx.Response(200, json={"total": 0, "results": []})
+
+    _install(monkeypatch, handler)
+    search("Leviathan Wakes Corey", providers=("isbndb",), limit=5)
+
+    # The query is a path segment, not a "?q=", and it travels percent-encoded.
+    assert seen["path"] == "/books/Leviathan Wakes Corey"
+    assert seen["url"].startswith("https://api2.isbndb.com/books/Leviathan%20Wakes%20Corey")
+    assert seen["page_size"] == "5"
+
+
+def test_an_isbndb_book_object_becomes_a_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    _install(monkeypatch, _isbndb_payload)
+    result = search("Leviathan Wakes", providers=("isbndb",))
+
+    assert len(result.candidates) == 1
+    candidate = result.candidates[0]
+    assert candidate.provider == "isbndb"
+    assert candidate.provider_key == "9780441018369"
+    assert candidate.title == "Leviathan Wakes"
+    assert candidate.authors == ("James S.A. Corey",)
+    assert candidate.publisher == "Orbit"
+    assert candidate.published_year == 2011
+    assert candidate.page_count == 592
+    assert candidate.isbn == "9780441018369"
+    assert candidate.language == "en"
+    assert [cover.url for cover in candidate.covers] == [
+        "https://isbndb.com/cover/9780441018369.jpg"
+    ]
+
+
+def test_isbndb_books_without_a_title_are_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    payload = {"total": 2, "results": [{"publisher": "Nobody Press"}, _ISBNDB_BOOK]}
+    _install(monkeypatch, lambda request: httpx.Response(200, json=payload))
+
+    candidates = search("Leviathan Wakes", providers=("isbndb",)).candidates
+
+    assert [candidate.title for candidate in candidates] == ["Leviathan Wakes"]
+
+
+def test_isbndb_answers_after_open_library_in_registry_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    _install(monkeypatch, _isbndb_mixed_handler)
+
+    result = search("Leviathan Wakes", providers=("openlibrary", "isbndb"))
+
+    assert [candidate.provider for candidate in result.candidates] == ["openlibrary", "isbndb"]
+    assert result.failed is False
+
+
+def test_isbndb_is_not_called_when_it_is_not_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "test-key")
+    hosts = _install_hosts(monkeypatch, _isbndb_payload)
+
+    search("Leviathan Wakes", providers=("openlibrary",))
+
+    assert hosts == ["openlibrary.org"]  # a configured key is not an opt-in
+
+
+def test_isbndb_is_not_called_without_a_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", None)
+    hosts = _install_hosts(monkeypatch, _isbndb_payload)
+
+    result = search("Leviathan Wakes", providers=("openlibrary", "isbndb"))
+
+    assert hosts == ["openlibrary.org"]  # enabled but unanswerable: skipped, not failed
+    assert result.failed is False
+    assert [candidate.provider for candidate in result.candidates] == []
+
+
+def test_a_readers_own_isbndb_key_wins_over_the_server_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "server-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers.get("Authorization", "")
+        return httpx.Response(200, json={"results": []})
+
+    _install(monkeypatch, handler)
+    search("Leviathan Wakes", providers=("isbndb",), provider_keys={"isbndb": "userkey"})
+
+    assert seen["auth"] == "userkey"
+
+
+def test_an_isbndb_rejection_is_reported_by_name_and_not_retried_elsewhere(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A 401 from a bad key surfaces as an HTTPError, which search() turns into a
+    # named message. Open Library is never asked again to make up the shortfall.
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "isbndb_api_key", "wrong-key")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "isbndb" in request.url.host:
+            return httpx.Response(401, json={"message": "Unauthorized"})
+        return httpx.Response(200, json={"docs": []})
+
+    hosts = _install_hosts(monkeypatch, handler)
+    result = search("Leviathan Wakes", providers=("openlibrary", "isbndb"))
+
+    assert result.error == "ISBNdb is unreachable: HTTPStatusError"
+    assert hosts == ["openlibrary.org", "api2.isbndb.com"]
+
+
 def test_provider_cover_download_returns_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
     _install(monkeypatch, lambda request: httpx.Response(200, content=b"\xff\xd8\xff\xfffakejpeg"))
 

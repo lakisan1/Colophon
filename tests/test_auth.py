@@ -619,6 +619,10 @@ def test_settings_offers_a_key_field_per_keyed_provider(auth_client: TestClient)
 
     assert "Google Books API key" in page.text
     assert 'name="provider_key_googlebooks"' in page.text
+    # ISBNdb is keyed as well, so its checkbox and its key input came from the
+    # registry with no template edit.
+    assert "ISBNdb API key" in page.text
+    assert 'name="provider_key_isbndb"' in page.text
     # Open Library needs no key, so it gets no field asking for one.
     assert 'name="provider_key_openlibrary"' not in page.text
 

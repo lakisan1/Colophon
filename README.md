@@ -50,7 +50,7 @@ One search box plus a powerful Advanced panel.
 ### ➕ Add & Lookup
 Add a book in seconds.
 
-- **Lookup**: type an ISBN or a title+author and Colophon fills the form from Open Library or Google Books.
+- **Lookup**: type an ISBN or a title+author and Colophon fills the form from Open Library, Google Books or ISBNdb.
 - **Manual entry**: every detail is optional; the shelf still draws a realistic spine either way.
 - **Photos**: upload, crop, and EXIF are stripped on save; a provider cover is cached automatically.
 
@@ -115,6 +115,7 @@ All variables are optional in development:
 | `COLOPHON_UPLOAD_DIR` | Uploaded photos directory (default `data/photos/`) |
 | `COLOPHON_DEV_AUTH_BYPASS` | `1` skips login — development only |
 | `GOOGLE_BOOKS_KEY` | Optional Google Books lookup key; the app works fully without it |
+| `ISBNDB_API_KEY` | Optional ISBNdb v2 lookup key; the app works fully without it |
 
 ## 🧱 Tech
 

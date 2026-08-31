@@ -67,8 +67,11 @@
             </label>
           {% endif %}
         {% endfor %}
-        {% if "googlebooks" in prefs.search_providers and not prefs.provider_keys.get("googlebooks") and not google_books_key_configured %}
-          <p class="hint">Google Books is enabled, but no API key is set (paste one above, or set <code>GOOGLE_BOOKS_KEY</code> on the server), so it won't return anything.</p>
+        {% if missing_provider_keys %}
+          <p class="hint">
+            {{ missing_provider_keys | join(", ") }} {{ "is" if missing_provider_keys | length == 1 else "are" }}
+            enabled, but no API key is set (paste one above, or set the matching server env var), so it won't return anything.
+          </p>
         {% endif %}
       </fieldset>
 

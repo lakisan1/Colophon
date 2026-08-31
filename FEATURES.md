@@ -34,8 +34,9 @@ A comprehensive, categorized list of every feature in Colophon. Add to it as the
 - **Filter links that persist**: changing shelf keeps your filters; export honours them too.
 
 ## ➕ Add & Lookup
-- **Provider lookup**: type an ISBN or a title + author and Colophon fetches metadata from **Open Library**
-  or **Google Books** to pre-fill the form. Nothing saves until you press Save.
+- **Provider lookup**: type an ISBN or a title + author and Colophon fetches metadata from **Open Library**,
+  **Google Books** or **ISBNdb** to pre-fill the form — tick the keyed ones in Settings, and each
+  reader may paste their own API key there. Nothing saves until you press Save.
 - **Manual entry** with validation (ISBN format, year bounds, positive dimensions).
 - **Duplicate warning**: an ISBN or title you already own raises a heads-up but still saves.
 - **Oversize confirmation**: a dimension implausibly large for a book asks before saving.

@@ -1,7 +1,8 @@
 # Book metadata lookup (M4). Providers live in the PROVIDERS registry below:
-# Open Library is on for everyone, Google Books is opted into per user on the
-# settings page. A keyed provider is answered with the reader's own key when they
-# pasted one in Settings, and with the server-side GOOGLE_BOOKS_KEY otherwise.
+# Open Library is on for everyone, Google Books and ISBNdb are opted into per user
+# on the settings page. A keyed provider is answered with the reader's own key when
+# they pasted one in Settings, and with the server's own environment key otherwise
+# (GOOGLE_BOOKS_KEY, ISBNDB_API_KEY — one per provider in app/settings.py).
 #
 # Two rules shape this module. First: a provider call never raises — a network
 # timeout must not turn into a 500 page, so failures come back as LookupResult.error
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from urllib.parse import quote
 
 import httpx
 
@@ -20,6 +22,10 @@ from app.settings import settings
 
 OPEN_LIBRARY_SEARCH = "https://openlibrary.org/search.json"
 GOOGLE_BOOKS_SEARCH = "https://www.googleapis.com/books/v1/volumes"
+# ISBNdb v2 puts the search term in the path, so there are two endpoints: /books
+# for a title/author query, /book for one edition by ISBN.
+ISBNDB_BOOKS = "https://api2.isbndb.com/books"
+ISBNDB_BOOK = "https://api2.isbndb.com/book"
 USER_AGENT = "Colophon/0.1 (self-hosted book inventory)"
 DEFAULT_TIMEOUT = 8.0
 
@@ -46,10 +52,11 @@ class ProviderSpec:
 PROVIDERS: tuple[ProviderSpec, ...] = (
     ProviderSpec("openlibrary", "Open Library"),
     ProviderSpec("googlebooks", "Google Books", needs_key=True),
+    ProviderSpec("isbndb", "ISBNdb", needs_key=True),
 )
 
-# Registry order is query order, so the same two providers produce the same
-# candidate order for every reader, whichever box they ticked first.
+# Registry order is query order, so the same providers produce the same candidate
+# order for every reader, whichever boxes they ticked first.
 PROVIDER_ORDER = [spec.id for spec in PROVIDERS]
 PROVIDER_LABELS = {spec.id: spec.label for spec in PROVIDERS}
 _PROVIDERS_BY_ID = {spec.id: spec for spec in PROVIDERS}
@@ -64,7 +71,15 @@ def _provider_key(provider_id: str) -> str | None:
     """
     if provider_id == "googlebooks":
         return settings.google_books_key
+    if provider_id == "isbndb":
+        return settings.isbndb_api_key
     return None
+
+
+def provider_has_server_key(provider_id: str) -> bool:
+    """Whether a provider has a server-side env key configured, so the settings
+    page can warn about an enabled keyed provider that cannot actually answer."""
+    return bool(_provider_key(provider_id))
 
 
 @dataclass(frozen=True)
@@ -281,12 +296,82 @@ def _google_books(
     return candidates
 
 
+def _isbndb_book(
+    raw: str, isbn: str | None, limit: int, provider_key: str | None = None
+) -> list[Candidate]:
+    # ISBNdb authenticates with the reader's own key (else the server's) in an
+    # Authorization header, sent raw: no "Bearer" scheme in front of it.
+    headers = {"User-Agent": USER_AGENT, "Authorization": provider_key or settings.isbndb_api_key}
+    # The search term is a path segment rather than a query parameter, so it is
+    # percent-encoded here; an ISBN is already URL-safe and gets the edition
+    # endpoint, which takes no pageSize.
+    if isbn:
+        url, params = f"{ISBNDB_BOOK}/{isbn}", None
+    else:
+        url, params = f"{ISBNDB_BOOKS}/{quote(raw)}", {"pageSize": limit}
+
+    with CLIENT_FACTORY(timeout=DEFAULT_TIMEOUT, headers=headers) as client:
+        response = client.get(url, params=params)
+        # A 401 (bad key), 404 (no such book) or 429 (rate limited) is raised, so
+        # search() reports ISBNdb by name instead of quietly answering with less.
+        response.raise_for_status()
+        payload = response.json()
+
+    candidates: list[Candidate] = []
+    for book in _isbndb_items(payload):
+        title = (book.get("title") or "").strip()
+        if not title:
+            continue
+        key_isbn = str(book.get("isbn13") or book.get("isbn10") or "")
+        covers = (
+            (CoverCandidate("isbndb", str(book["image"]), "medium"),) if book.get("image") else ()
+        )
+        candidates.append(
+            Candidate(
+                provider="isbndb",
+                provider_key=key_isbn,
+                title=title[:300],
+                subtitle=None,
+                authors=tuple(
+                    str(author.get("name"))
+                    for author in book.get("authors") or []
+                    if isinstance(author, dict) and author.get("name")
+                ),
+                publisher=book.get("publisher") or None,
+                published_year=_year_from_date(book.get("date_published")),
+                page_count=_first_int(book.get("pages")),
+                isbn=normalize_isbn(key_isbn) or None,
+                language=book.get("language") or None,
+                covers=covers,
+            )
+        )
+    return candidates
+
+
+def _isbndb_items(payload: object) -> list[dict]:
+    """The book objects in an ISBNdb response, whatever shape it arrived in.
+
+    A search answers {"total": n, "results": [...]}, a single ISBN answers
+    {"book": {...}}, and some endpoints wrap one edition in "books". Anything else
+    — a bare list, an error body that still carried a 200 — is no books at all.
+    """
+    if not isinstance(payload, dict):
+        return []
+    for key in ("results", "books"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [book for book in value if isinstance(book, dict)]
+    book = payload.get("book")
+    return [book] if isinstance(book, dict) else []
+
+
 # One query function per provider id, every one of them taking
 # (raw query, normalised isbn or None, limit, the reader's own key or None) and
 # returning candidates.
 _QUERY_FUNCS: dict[str, Callable[[str, str | None, int, str | None], list[Candidate]]] = {
     "openlibrary": _open_library,
     "googlebooks": _google_books,
+    "isbndb": _isbndb_book,
 }
 
 

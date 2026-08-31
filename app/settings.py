@@ -32,6 +32,7 @@ class Settings:
     backup_dir: str
     dev_auth_bypass: bool
     google_books_key: str | None
+    isbndb_api_key: str | None
     cookie_secure: bool
 
 
@@ -55,6 +56,9 @@ def load_settings() -> Settings:
         dev_auth_bypass=_env_flag("COLOPHON_DEV_AUTH_BYPASS"),
         # T5 names this variable literally, without the COLOPHON_ prefix.
         google_books_key=os.environ.get("GOOGLE_BOOKS_KEY") or None,
+        # Same shape for ISBNdb: an optional server-side key, unset by default, so
+        # the app runs fully without it and the provider stays unreadable (skipped).
+        isbndb_api_key=os.environ.get("ISBNDB_API_KEY") or None,
         cookie_secure=_env_flag("COLOPHON_COOKIE_SECURE"),
     )
 

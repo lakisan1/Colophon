@@ -26,9 +26,8 @@ from app.auth import (
 from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.forms import read_form
-from app.lookup import PROVIDERS
-from app.page import load_prefs_into_state, page_context
-from app.settings import settings
+from app.lookup import PROVIDERS, provider_has_server_key
+from app.page import load_prefs_into_state, page_context, page_prefs
 from app.shelf import ZOOM_ROW_PX
 from app.templating import templates
 
@@ -314,8 +313,18 @@ def _render(
     if user.is_admin and users is None:
         users = _users_for_admin(session)
     users = users if user.is_admin else []
-    # `prefs` itself is one of the shared keys now (app/page.py), which is what
-    # the form below binds against; the router does not hand-assemble the theme.
+    # A keyed provider the reader enabled but cannot use (no personal key and no
+    # server key) is listed under the checkboxes so the search is never silently
+    # empty. `prefs` is the cached per-request preference, one of the shared keys.
+    prefs = page_prefs(request)
+    missing_provider_keys = [
+        spec.label
+        for spec in PROVIDERS
+        if spec.needs_key
+        and spec.id in prefs.search_providers
+        and not prefs.provider_keys.get(spec.id)
+        and not provider_has_server_key(spec.id)
+    ]
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -332,7 +341,7 @@ def _render(
             # The Search providers card is the registry rendered; the key flag only
             # decides whether the hint under it shows.
             providers=PROVIDERS,
-            google_books_key_configured=bool(settings.google_books_key),
+            missing_provider_keys=missing_provider_keys,
             users=users,
             admin_username=admin_username,
         ),

@@ -15,6 +15,9 @@ services:
       # COLOPHON_DEV_AUTH_BYPASS: "1"
       # Optional Google Books lookup key (T5); the app works fully without it.
       # GOOGLE_BOOKS_KEY: ""
+      # Optional ISBNdb v2 lookup key; optional in the same way, and a reader may
+      # bring their own key in /settings instead.
+      # ISBNDB_API_KEY: ""
       # Behind a reverse proxy, set the proxy's network so rate limiting keys on
       # real client IPs instead of the proxy (T9). Read by uvicorn directly.
       # FORWARDED_ALLOW_IPS: ""
