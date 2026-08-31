@@ -59,7 +59,9 @@
               </li>
             {% endfor %}
           </ul>
-        {% endif %}
+          {% elif not lookup.failed %}
+            <p class="hint">No matches found for “{{ lookup.query }}”. Try a different title, author or ISBN.</p>
+          {% endif %}
       </div>
     {% endif %}
 
