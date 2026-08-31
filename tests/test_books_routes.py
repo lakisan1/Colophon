@@ -727,3 +727,51 @@ def test_delete_book_with_the_account_password(seeded_client: TestClient) -> Non
     assert deleted.status_code == 303
     assert deleted.headers["location"] == "/"
     assert _book_count(seeded_client) == before - 1
+
+
+# --- Book designer (the cover/typography credit) ----------------------------
+
+
+def _store_designer_book(client: TestClient, title: str = "The Names of Cities") -> int:
+    """POST a new book carrying a book_designer; return its id."""
+    response = client.post(
+        "/book/new",
+        data={"title": title, "book_designer": "Chip Kidd"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    return _last_book_id()
+
+
+def test_book_designer_is_stored_on_save(seeded_client: TestClient) -> None:
+    from app.db import SessionLocal
+
+    book_id = _store_designer_book(seeded_client)
+
+    with SessionLocal() as session:
+        stored = session.execute(
+            text("SELECT book_designer FROM books WHERE id = :i"), {"i": book_id}
+        ).scalar_one()
+    assert stored == "Chip Kidd"
+
+
+def test_book_detail_page_shows_the_book_designer(seeded_client: TestClient) -> None:
+    book_id = _store_designer_book(seeded_client)
+
+    body = seeded_client.get(f"/book/{book_id}").text
+
+    assert "Book designer" in body
+    assert "Chip Kidd" in body
+
+
+def test_add_form_offers_existing_designers_as_datalist_options(seeded_client: TestClient) -> None:
+    _store_designer_book(seeded_client)
+
+    body = seeded_client.get("/book/new").text
+
+    # Same pick-or-type-new shape as the Illustrator field: an input wired to a
+    # datalist that already lists the reader's existing designer names.
+    assert 'name="book_designer"' in body
+    assert 'list="designer-options"' in body
+    assert 'id="designer-options"' in body
+    assert '<option value="Chip Kidd">' in body

@@ -179,6 +179,16 @@
                 {% endfor %}
               </datalist>
             </label>
+            <label class="field field-wide">
+              <span class="label">Book designer</span>
+              <input name="book_designer" value="{{ values.get('book_designer') or '' }}" list="designer-options"
+                     placeholder="Who designed the cover or typography">
+              <datalist id="designer-options">
+                {% for name in designer_names|default([]) %}
+                  <option value="{{ name }}"></option>
+                {% endfor %}
+              </datalist>
+            </label>
             <label class="field">
               <span class="label">Edition</span>
               <input name="edition" value="{{ values.get('edition') or '' }}" maxlength="120">

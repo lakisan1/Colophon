@@ -494,6 +494,7 @@ _TEXT_FIELDS = (
     "inscription",
     "notes",
     "illustrator",
+    "book_designer",
     "translator",
     "editor",
     "original_title",
@@ -836,6 +837,7 @@ _INSERT_COLUMNS = (
     "inscription",
     "notes",
     "illustrator",
+    "book_designer",
     "translator",
     "editor",
     "original_title",
@@ -1114,6 +1116,17 @@ def _render_form(
             {"o": user.id},
         ).scalars()
     )
+    # Book designer (cover/typography) uses the same pick-or-type-new behaviour.
+    designer_names = list(
+        session.execute(
+            text(
+                "SELECT DISTINCT book_designer FROM books"
+                " WHERE owner_id = :o AND book_designer IS NOT NULL AND book_designer != ''"
+                " ORDER BY book_designer"
+            ),
+            {"o": user.id},
+        ).scalars()
+    )
     # Translator and Editor use the same pick-or-type-new behaviour.
     translator_names = list(
         session.execute(
@@ -1203,6 +1216,7 @@ def _render_form(
             series_names=series_names,
             author_names=author_names,
             illustrator_names=illustrator_names,
+            designer_names=designer_names,
             translator_names=translator_names,
             editor_names=editor_names,
             tag_names=tag_names,

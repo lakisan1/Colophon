@@ -30,6 +30,12 @@
             <td>{{ book.illustrator }}</td>
           </tr>
           {% endif %}
+          {% if book.book_designer %}
+          <tr>
+            <th scope="row">Book designer</th>
+            <td>{{ book.book_designer }}</td>
+          </tr>
+          {% endif %}
           {% if book.translator %}
           <tr>
             <th scope="row">Translator{{ "" if book.translator and "," not in book.translator else "s" }}</th>
