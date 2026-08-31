@@ -24,6 +24,16 @@ def create_app() -> FastAPI:
     app.include_router(export.router)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+    # Static assets revalidate on every load so a CSS/JS change shows up on a
+    # plain refresh (no hard-refresh). Without this the browser heuristically
+    # caches stylesheets and keeps showing a stale "old" UI after an edit.
+    @app.middleware("http")
+    async def no_cache_static(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["cache-control"] = "no-cache"
+        return response
+
     @app.exception_handler(LoginRequired)
     def login_required_handler(_request: Request, _exc: LoginRequired) -> RedirectResponse:
         # 303 so a browser re-issues a plain GET to /login after any method.
