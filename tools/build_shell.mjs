@@ -105,6 +105,7 @@ html, body {
 .card-title {
   margin: 0 0 0.9rem;
   font-size: 1.1rem;
+  color: var(--ink-muted);
 }
 
 .card-hint {
