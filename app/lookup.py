@@ -1,5 +1,6 @@
-# Book metadata lookup (M4). Open Library is the primary provider; Google Books is
-# opt-in behind GOOGLE_BOOKS_KEY.
+# Book metadata lookup (M4). Providers live in the PROVIDERS registry below:
+# Open Library is on for everyone, Google Books is opted into per user on the
+# settings page and still needs the server-side GOOGLE_BOOKS_KEY.
 #
 # Two rules shape this module. First: a provider call never raises — a network
 # timeout must not turn into a 500 page, so failures come back as LookupResult.error
@@ -8,6 +9,7 @@
 # indistinguishable from "this book does not exist".
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 import httpx
@@ -23,6 +25,45 @@ DEFAULT_TIMEOUT = 8.0
 # Indirection so tests can hand the module a stub transport instead of reaching
 # the network. Production always uses httpx.Client.
 CLIENT_FACTORY = httpx.Client
+
+
+@dataclass(frozen=True)
+class ProviderSpec:
+    """One search provider the settings page can offer.
+
+    Adding a provider is one entry in PROVIDERS plus one function in
+    _QUERY_FUNCS: the settings checkbox, the dispatch in search() and the label
+    in an error message all read from this registry, so nothing else has to
+    learn the new provider's name.
+    """
+
+    id: str
+    label: str
+    needs_key: bool = False
+
+
+PROVIDERS: tuple[ProviderSpec, ...] = (
+    ProviderSpec("openlibrary", "Open Library"),
+    ProviderSpec("googlebooks", "Google Books", needs_key=True),
+)
+
+# Registry order is query order, so the same two providers produce the same
+# candidate order for every reader, whichever box they ticked first.
+PROVIDER_ORDER = [spec.id for spec in PROVIDERS]
+PROVIDER_LABELS = {spec.id: spec.label for spec in PROVIDERS}
+_PROVIDERS_BY_ID = {spec.id: spec for spec in PROVIDERS}
+
+
+def _provider_key(provider_id: str) -> str | None:
+    """The server-side API key a needs_key provider requires, when configured.
+
+    A key lives in app/settings.py (one environment variable per provider), never
+    in the user's row: the preference says "ask this provider", the server says
+    whether it is able to.
+    """
+    if provider_id == "googlebooks":
+        return settings.google_books_key
+    return None
 
 
 @dataclass(frozen=True)
@@ -62,27 +103,39 @@ class LookupResult:
         return self.error is not None
 
 
-def search(query: str, *, include_google: bool = False, limit: int = 8) -> LookupResult:
-    """Look a book up by ISBN when the query is one, otherwise by title/author."""
+def search(
+    query: str, *, providers: Iterable[str] = ("openlibrary",), limit: int = 8
+) -> LookupResult:
+    """Look a book up by ISBN when the query is one, otherwise by title/author.
+
+    `providers` is the reader's enabled set; everything happens in registry
+    order. An id the registry does not know is ignored rather than fatal, and an
+    empty set calls nobody — no candidates and no error, because nothing failed.
+    """
     raw = (query or "").strip()
     if not raw:
         return LookupResult(query=raw)
 
     isbn = normalize_isbn(raw)
     result = LookupResult(query=raw)
+    enabled = set(providers)
 
-    try:
-        result.candidates = _open_library(raw, isbn, limit)
-    except httpx.HTTPError as exc:
-        # Reported, not retried somewhere else.
-        result.error = f"Open Library is unreachable: {type(exc).__name__}"
-        return result
-
-    if include_google and settings.google_books_key:
+    for provider_id in PROVIDER_ORDER:
+        if provider_id not in enabled or provider_id not in PROVIDER_LABELS:
+            continue
+        query_func = _QUERY_FUNCS.get(provider_id)
+        if query_func is None:  # registered without a query function: nobody to ask
+            continue
+        if _PROVIDERS_BY_ID[provider_id].needs_key and not _provider_key(provider_id):
+            # Enabled but unusable: the server has no key, so this provider stays
+            # silent instead of failing every search it takes part in.
+            continue
         try:
-            result.candidates += _google_books(raw, limit)
+            result.candidates += query_func(raw, isbn, limit)
         except httpx.HTTPError as exc:
-            result.error = f"Google Books is unreachable: {type(exc).__name__}"
+            # Named, not retried somewhere else. It ends this provider's turn and
+            # nothing more: a second provider the reader enabled still answers.
+            result.error = f"{PROVIDER_LABELS[provider_id]} is unreachable: {type(exc).__name__}"
 
     return result
 
@@ -160,8 +213,11 @@ def _candidate_from_ol(document: dict) -> Candidate | None:
     )
 
 
-def _google_books(raw: str, limit: int) -> list[Candidate]:
-    params = {"q": raw, "maxResults": limit, "key": settings.google_books_key}
+def _google_books(raw: str, isbn: str | None, limit: int) -> list[Candidate]:
+    params: dict[str, str | int] = {"maxResults": limit, "key": settings.google_books_key}
+    # Same rule as Open Library: an ISBN is searched exactly, anything else is
+    # the free-text title/author query.
+    params["q"] = f"isbn:{isbn}" if isbn else raw
     with CLIENT_FACTORY(timeout=DEFAULT_TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
         response = client.get(GOOGLE_BOOKS_SEARCH, params=params)
         response.raise_for_status()
@@ -201,6 +257,14 @@ def _google_books(raw: str, limit: int) -> list[Candidate]:
             )
         )
     return candidates
+
+
+# One query function per provider id, every one of them taking
+# (raw query, normalised isbn or None, limit) and returning candidates.
+_QUERY_FUNCS: dict[str, Callable[[str, str | None, int], list[Candidate]]] = {
+    "openlibrary": _open_library,
+    "googlebooks": _google_books,
+}
 
 
 def _first_int(values) -> int | None:

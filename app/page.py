@@ -22,7 +22,7 @@ from fastapi import Request
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.prefs import DEFAULTS, Prefs, load_prefs
+from app.prefs import Prefs, default_prefs, load_prefs
 
 if TYPE_CHECKING:
     # Typing only: app.deps imports this module, so importing it back at runtime
@@ -42,7 +42,7 @@ def page_prefs(request: Request) -> Prefs:
     """
     prefs = getattr(request.state, PREFS_STATE, None)
     if prefs is None:
-        prefs = Prefs(**DEFAULTS)
+        prefs = default_prefs()
         setattr(request.state, PREFS_STATE, prefs)
     return prefs
 
@@ -58,7 +58,7 @@ def load_prefs_into_state(request: Request, session: Session, owner_id: int) -> 
         prefs = load_prefs(session, owner_id)
     except OperationalError:
         # An unmigrated database: render with the defaults, same as the dev user.
-        prefs = Prefs(**DEFAULTS)
+        prefs = default_prefs()
     setattr(request.state, PREFS_STATE, prefs)
 
 

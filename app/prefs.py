@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.shelf import DEFAULT_ZOOM
 
 # Column order shared by the two lookups below.
-_COLUMNS = "currency_symbol, date_format, time_format, theme, zoom_preset, google_books"
+_COLUMNS = "currency_symbol, date_format, time_format, theme, zoom_preset, search_providers"
 
 DEFAULTS = {
     "currency_symbol": "€",
@@ -20,7 +20,9 @@ DEFAULTS = {
     "time_format": "24h",
     "theme": "light",
     "zoom_preset": DEFAULT_ZOOM,
-    "google_books": 0,
+    # Open Library needs no key and no configuration, so it is the provider
+    # everybody gets; anything else is opted into on the settings page.
+    "search_providers": "openlibrary",
 }
 
 
@@ -33,7 +35,29 @@ class Prefs:
     time_format: str
     theme: str
     zoom_preset: str
-    google_books: bool
+    search_providers: frozenset[str]
+
+
+def parse_providers(raw: object) -> frozenset[str]:
+    """Turn the stored "openlibrary,googlebooks" string into a set of ids.
+
+    Stored as a string because a preference is one column; read as a set because
+    every question asked of it is "is this provider enabled". Unknown ids are kept
+    rather than dropped — a provider that leaves the registry must not rewrite
+    anyone's row — and app/lookup.py is the place that decides what it can answer.
+    """
+    return frozenset(part.strip() for part in str(raw or "").split(",") if part.strip())
+
+
+def default_prefs() -> Prefs:
+    """Prefs straight out of DEFAULTS, for a request that read no row.
+
+    DEFAULTS holds column-shaped values, so the provider string is parsed here
+    rather than at every caller that has no owner or no settings table.
+    """
+    defaults = dict(DEFAULTS)
+    defaults["search_providers"] = parse_providers(defaults["search_providers"])
+    return Prefs(**defaults)
 
 
 def load_prefs(session: Session, owner_id: int) -> Prefs:
@@ -45,8 +69,8 @@ def load_prefs(session: Session, owner_id: int) -> Prefs:
     values = {
         key: (value if value not in (None, "") else DEFAULTS[key]) for key, value in values.items()
     }
-    # The stored flag is 0/1 from SQLite; expose it as a real boolean.
-    values["google_books"] = bool(values.get("google_books"))
+    # Comma-separated in the column, a set everywhere else (see parse_providers).
+    values["search_providers"] = parse_providers(values.get("search_providers"))
     return Prefs(**values)
 
 

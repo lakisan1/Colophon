@@ -191,11 +191,13 @@ def test_google_books_shows_in_search_when_enabled(
         ).first()
         if row:
             conn.execute(
-                text("UPDATE settings SET google_books = 1 WHERE owner_id = :o"), {"o": owner}
+                text("UPDATE settings SET search_providers = :p WHERE owner_id = :o"),
+                {"p": "openlibrary,googlebooks", "o": owner},
             )
         else:
             conn.execute(
-                text("INSERT INTO settings (owner_id, google_books) VALUES (:o, 1)"), {"o": owner}
+                text("INSERT INTO settings (owner_id, search_providers) VALUES (:o, :p)"),
+                {"p": "openlibrary,googlebooks", "o": owner},
             )
     monkeypatch.setattr(settings, "google_books_key", "test-key")
     _install_mixed_lookup(monkeypatch)
@@ -207,6 +209,8 @@ def test_google_books_shows_in_search_when_enabled(
 
 
 def test_google_books_is_absent_by_default(seeded_db, monkeypatch: pytest.MonkeyPatch) -> None:
+    # search_providers stays at its 'openlibrary' default even though a key is
+    # configured: the key makes Google Books possible, the preference makes it asked.
     client, _engine = seeded_db
     monkeypatch.setattr(settings, "google_books_key", "test-key")
     _install_mixed_lookup(monkeypatch)

@@ -25,6 +25,7 @@ from app.auth import (
 from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.forms import read_form
+from app.lookup import PROVIDERS
 from app.page import load_prefs_into_state, page_context
 from app.settings import settings
 from app.shelf import ZOOM_ROW_PX
@@ -66,7 +67,14 @@ async def update_settings(
     date_format = (values.get("date_format") or "").strip()
     time_format = (values.get("time_format") or "").strip()
     currency = (values.get("currency_symbol") or "").strip()
-    google_books = values.get("google_books") == "1"
+    # One checkbox per provider, named after its registry id, so a provider added
+    # to app/lookup.py appears here and is stored without touching this function.
+    enabled = [spec.id for spec in PROVIDERS if values.get(f"provider_{spec.id}") == "1"]
+    if not enabled:
+        # Nothing ticked means a search that can never answer, which reads as a
+        # broken button rather than a preference — so Open Library stays on.
+        enabled = ["openlibrary"]
+    search_providers = ",".join(enabled)
 
     if theme not in THEMES:
         errors.append(f"Theme must be one of: {', '.join(THEMES)}.")
@@ -82,7 +90,9 @@ async def update_settings(
     if errors:
         return _render(request, session, user, notice=None, errors=errors)
 
-    _upsert_prefs(session, user.id, currency, date_format, time_format, theme, zoom, google_books)
+    _upsert_prefs(
+        session, user.id, currency, date_format, time_format, theme, zoom, search_providers
+    )
     # The page must show what was just saved: the request cached its prefs before
     # this write (in current_user), so re-read them before rendering.
     load_prefs_into_state(request, session, user.id)
@@ -218,15 +228,14 @@ def _upsert_prefs(
     time_format: str,
     theme: str,
     zoom: str,
-    google_books: bool,
+    search_providers: str,
 ) -> None:
-    flag = 1 if google_books else 0
     updated = session.execute(
         text(
             """
             UPDATE settings
             SET currency_symbol = :currency, date_format = :date_format, time_format = :time_format,
-                theme = :theme, zoom_preset = :zoom, google_books = :google_books
+                theme = :theme, zoom_preset = :zoom, search_providers = :search_providers
             WHERE owner_id = :owner_id
             """
         ),
@@ -236,7 +245,7 @@ def _upsert_prefs(
             "time_format": time_format,
             "theme": theme,
             "zoom": zoom,
-            "google_books": flag,
+            "search_providers": search_providers,
             "owner_id": owner_id,
         },
     )
@@ -246,9 +255,9 @@ def _upsert_prefs(
                 """
                 INSERT INTO settings
                     (owner_id, currency_symbol, date_format, time_format, theme, zoom_preset,
-                     google_books)
+                     search_providers)
                 VALUES (:owner_id, :currency, :date_format, :time_format, :theme, :zoom,
-                        :google_books)
+                        :search_providers)
                 """
             ),
             {
@@ -257,7 +266,7 @@ def _upsert_prefs(
                 "time_format": time_format,
                 "theme": theme,
                 "zoom": zoom,
-                "google_books": flag,
+                "search_providers": search_providers,
                 "owner_id": owner_id,
             },
         )
@@ -294,6 +303,9 @@ def _render(
             date_formats=DATE_FORMATS,
             time_formats=TIME_FORMATS,
             default_credentials=uses_default_credentials(session, user.id),
+            # The Search providers card is the registry rendered; the key flag only
+            # decides whether the hint under it shows.
+            providers=PROVIDERS,
             google_books_key_configured=bool(settings.google_books_key),
             users=users,
             admin_username=admin_username,

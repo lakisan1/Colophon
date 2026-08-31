@@ -23,6 +23,7 @@ from app.auth import (
     load_session,
     touch_session,
 )
+from app.lookup import PROVIDERS
 from app.main import create_app
 from app.settings import settings
 from tests.alembic_runner import engine_for, run_alembic
@@ -522,6 +523,101 @@ def test_settings_can_be_changed_and_are_remembered(auth_client: TestClient) -> 
 
     again = auth_client.get("/settings")
     assert "selected>dark" in again.text.replace(" ", "") or 'value="dark"' in again.text
+
+
+def _stored_search_providers(engine: Engine) -> str:
+    with engine.connect() as conn:
+        return str(
+            conn.execute(
+                text(
+                    "SELECT search_providers FROM settings "
+                    "WHERE owner_id = (SELECT id FROM users WHERE username = 'admin')"
+                )
+            ).scalar_one()
+        )
+
+
+_SETTINGS_FIELDS = {
+    "theme": "light",
+    "zoom_preset": "M",
+    "currency_symbol": "\u20ac",
+    "date_format": "dd.mm.yyyy",
+    "time_format": "24h",
+}
+
+
+def test_settings_offers_one_checkbox_per_search_provider(auth_client: TestClient) -> None:
+    """The card is the registry rendered: a new provider needs no template edit."""
+    sign_in(auth_client)
+    page = auth_client.get("/settings")
+
+    assert "<legend>Search providers</legend>" in page.text
+    for spec in PROVIDERS:
+        assert f'name="provider_{spec.id}"' in page.text
+    # The single per-user flag is gone rather than merely hidden.
+    assert 'name="google_books"' not in page.text
+
+
+def test_both_search_providers_are_stored_together(
+    auth_client: TestClient, auth_engine: Engine
+) -> None:
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
+    saved = auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_openlibrary": "1",
+            "provider_googlebooks": "1",
+        },
+    )
+
+    assert saved.status_code == 200
+    assert _stored_search_providers(auth_engine) == "openlibrary,googlebooks"
+    page = auth_client.get("/settings")
+    assert 'name="provider_openlibrary" value="1" checked' in page.text
+    assert 'name="provider_googlebooks" value="1" checked' in page.text
+
+
+def test_a_enabled_provider_without_a_key_is_flagged_on_the_page(
+    auth_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ticking Google Books with no server key is a preference that answers nothing."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+    monkeypatch.setattr(settings, "google_books_key", None)
+    auth_client.post(
+        "/settings",
+        data={"csrf_token": token, **_SETTINGS_FIELDS, "provider_googlebooks": "1"},
+    )
+
+    assert "no API key is configured" in auth_client.get("/settings").text
+
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    assert "no API key is configured" not in auth_client.get("/settings").text
+
+
+def test_a_search_always_has_somebody_to_ask(auth_client: TestClient, auth_engine: Engine) -> None:
+    """No box ticked is not a preference for silence: Open Library stays on."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
+    opted_in = auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_googlebooks": "1",
+        },
+    )
+    assert opted_in.status_code == 200
+    assert _stored_search_providers(auth_engine) == "googlebooks"
+
+    auth_client.post("/settings", data={"csrf_token": token, **_SETTINGS_FIELDS})
+
+    assert _stored_search_providers(auth_engine) == "openlibrary"
 
 
 def test_the_shelf_follows_the_stored_zoom(auth_client: TestClient) -> None:

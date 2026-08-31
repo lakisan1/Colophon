@@ -10,7 +10,14 @@ import httpx
 import pytest
 
 from app import lookup as lookup_module
-from app.lookup import fetch_provider_cover, isbn_lookup, search
+from app.lookup import (
+    PROVIDER_LABELS,
+    PROVIDER_ORDER,
+    PROVIDERS,
+    fetch_provider_cover,
+    isbn_lookup,
+    search,
+)
 
 
 def _stub(handler, calls: list[str]):
@@ -168,7 +175,7 @@ def test_google_books_is_not_called_without_a_key(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(settings, "google_books_key", None)
     hosts = _install_hosts(monkeypatch, lambda request: httpx.Response(200, json={"docs": []}))
 
-    search("Dune", include_google=True)
+    search("Dune", providers=("openlibrary", "googlebooks"))
 
     assert hosts == ["openlibrary.org"]  # no second provider is reached
 
@@ -202,7 +209,7 @@ def test_google_books_results_are_parsed_when_a_key_is_set(monkeypatch: pytest.M
         return httpx.Response(200, json={"docs": []})
 
     _install(monkeypatch, handler)
-    result = search("The Left Hand of Darkness", include_google=True)
+    result = search("The Left Hand of Darkness", providers=("openlibrary", "googlebooks"))
 
     google = [candidate for candidate in result.candidates if candidate.provider == "googlebooks"]
     assert len(google) == 1
@@ -210,6 +217,119 @@ def test_google_books_results_are_parsed_when_a_key_is_set(monkeypatch: pytest.M
     assert google[0].page_count == 192
     assert google[0].isbn == "9780441478125"  # ISBN-10 re-keyed to 13 with a recomputed check digit
     assert google[0].covers[0].url.endswith("thumb.jpg")
+
+
+# --- the provider registry: what Settings renders and search() dispatches on ---
+
+_GOOGLE_ITEM = {
+    "id": "g1",
+    "volumeInfo": {
+        "title": "Leviathan Wakes",
+        "authors": ["James S.A. Corey"],
+        "publisher": "Orbit",
+        "publishedDate": "2011-08-16",
+        "pageCount": 592,
+        "language": "en",
+        "imageLinks": {"thumbnail": "https://books.example/thumb.jpg"},
+    },
+}
+
+
+def _one_book_each(request: httpx.Request) -> httpx.Response:
+    """The same title from both hosts, so a candidate's provider says who answered."""
+    if "googleapis" in request.url.host:
+        return httpx.Response(200, json={"items": [_GOOGLE_ITEM]})
+    return httpx.Response(200, json={"docs": [_OL_DOCUMENT]})
+
+
+def test_every_registered_provider_is_searchable() -> None:
+    # The registry is the single source: an entry without a query function would
+    # be a checkbox in Settings that silently never returns anything.
+    assert [spec.id for spec in PROVIDERS] == PROVIDER_ORDER
+    assert {spec.id: spec.label for spec in PROVIDERS} == PROVIDER_LABELS
+    for spec in PROVIDERS:
+        assert spec.id in lookup_module._QUERY_FUNCS
+
+
+def test_only_the_enabled_provider_is_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    hosts = _install_hosts(monkeypatch, _one_book_each)
+
+    result = search("Leviathan Wakes", providers=("googlebooks",))
+
+    assert hosts == ["www.googleapis.com"]  # Open Library stays untouched
+    assert [candidate.provider for candidate in result.candidates] == ["googlebooks"]
+
+
+def test_both_enabled_providers_answer_into_one_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    _install(monkeypatch, _one_book_each)
+
+    result = search("Leviathan Wakes", providers=("openlibrary", "googlebooks"))
+
+    assert [candidate.provider for candidate in result.candidates] == [
+        "openlibrary",
+        "googlebooks",
+    ]
+    assert result.failed is False
+
+
+def test_an_isbn_query_reaches_google_books_as_an_isbn_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "googleapis" in request.url.host:
+            seen["q"] = request.url.params.get("q", "")
+            seen["key"] = request.url.params.get("key", "")
+        return httpx.Response(200, json={"items": [], "docs": []})
+
+    _install(monkeypatch, handler)
+    search("978-0441018369", providers=("openlibrary", "googlebooks"))
+
+    assert seen["q"] == "isbn:9780441018369"  # exact, not the raw dashed string
+    assert seen["key"] == "test-key"
+
+
+def test_an_unknown_provider_id_yields_nothing_without_an_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A provider that left the registry can still sit in someone's row. Ignoring
+    # it is right; failing the search is not — nothing went wrong.
+    calls = _install(monkeypatch, lambda request: httpx.Response(200, json={"docs": []}))
+
+    result = search("Dune", providers=("nope",))
+
+    assert result.candidates == []
+    assert result.failed is False
+    assert calls == []
+
+
+def test_one_provider_being_down_does_not_silence_the_other(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "test-key")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "googleapis" in request.url.host:
+            return httpx.Response(200, json={"items": [_GOOGLE_ITEM]})
+        raise httpx.ConnectTimeout("connection timed out")
+
+    _install(monkeypatch, handler)
+    result = search("Leviathan Wakes", providers=("openlibrary", "googlebooks"))
+
+    assert result.error == "Open Library is unreachable: ConnectTimeout"
+    assert [candidate.provider for candidate in result.candidates] == ["googlebooks"]
 
 
 def test_provider_cover_download_returns_bytes(monkeypatch: pytest.MonkeyPatch) -> None:

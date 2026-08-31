@@ -51,14 +51,21 @@
             {% endfor %}
           </select>
         </label>
-        <label class="check field-wide">
-          <input type="checkbox" name="google_books" value="1" {% if prefs.google_books %}checked{% endif %}>
-          Google Books — also search it alongside Open Library
-        </label>
-        {% if prefs.google_books and not google_books_key_configured %}
-          <p class="hint">Google Books is on, but no API key is configured (set <code>GOOGLE_BOOKS_KEY</code> on the server), so it won't return anything.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Search providers</legend>
+        {% for provider in providers %}
+          <label class="check field-wide">
+            <input type="checkbox" name="provider_{{ provider.id }}" value="1" {% if provider.id in prefs.search_providers %}checked{% endif %}>
+            {{ provider.label }}
+          </label>
+        {% endfor %}
+        {% if "googlebooks" in prefs.search_providers and not google_books_key_configured %}
+          <p class="hint">Google Books is enabled, but no API key is configured (set <code>GOOGLE_BOOKS_KEY</code> on the server), so it won't return anything.</p>
         {% endif %}
       </fieldset>
+
       <p class="form-actions"><button type="submit" class="btn btn-primary">Save settings</button></p>
     </form>
 

@@ -1047,7 +1047,7 @@ def _render_form(
         # otherwise the page confirms a value it does not display.
         values.update(outcome.values)
     lookup = (
-        search(lookup_query, include_google=page_prefs(request).google_books)
+        search(lookup_query, providers=page_prefs(request).search_providers)
         if lookup_query
         else None
     )
