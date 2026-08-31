@@ -1,6 +1,7 @@
 # Book metadata lookup (M4). Providers live in the PROVIDERS registry below:
 # Open Library is on for everyone, Google Books is opted into per user on the
-# settings page and still needs the server-side GOOGLE_BOOKS_KEY.
+# settings page. A keyed provider is answered with the reader's own key when they
+# pasted one in Settings, and with the server-side GOOGLE_BOOKS_KEY otherwise.
 #
 # Two rules shape this module. First: a provider call never raises — a network
 # timeout must not turn into a 500 page, so failures come back as LookupResult.error
@@ -9,7 +10,7 @@
 # indistinguishable from "this book does not exist".
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 
 import httpx
@@ -55,11 +56,11 @@ _PROVIDERS_BY_ID = {spec.id: spec for spec in PROVIDERS}
 
 
 def _provider_key(provider_id: str) -> str | None:
-    """The server-side API key a needs_key provider requires, when configured.
+    """The server-side API key a needs_key provider falls back to, when configured.
 
-    A key lives in app/settings.py (one environment variable per provider), never
-    in the user's row: the preference says "ask this provider", the server says
-    whether it is able to.
+    A server key lives in app/settings.py (one environment variable per provider).
+    The reader's own key — prefs.provider_keys, resolved by search() — wins over
+    it; this function is only asked what the installation itself can offer.
     """
     if provider_id == "googlebooks":
         return settings.google_books_key
@@ -104,13 +105,21 @@ class LookupResult:
 
 
 def search(
-    query: str, *, providers: Iterable[str] = ("openlibrary",), limit: int = 8
+    query: str,
+    *,
+    providers: Iterable[str] = ("openlibrary",),
+    provider_keys: Mapping[str, str] | None = None,
+    limit: int = 8,
 ) -> LookupResult:
     """Look a book up by ISBN when the query is one, otherwise by title/author.
 
     `providers` is the reader's enabled set; everything happens in registry
     order. An id the registry does not know is ignored rather than fatal, and an
     empty set calls nobody — no candidates and no error, because nothing failed.
+
+    `provider_keys` is the reader's own keys (provider id -> key, from their
+    settings row). A key there is used for that provider; with none, the server's
+    environment key is the fallback, and with neither the provider is skipped.
     """
     raw = (query or "").strip()
     if not raw:
@@ -126,12 +135,15 @@ def search(
         query_func = _QUERY_FUNCS.get(provider_id)
         if query_func is None:  # registered without a query function: nobody to ask
             continue
-        if _PROVIDERS_BY_ID[provider_id].needs_key and not _provider_key(provider_id):
-            # Enabled but unusable: the server has no key, so this provider stays
-            # silent instead of failing every search it takes part in.
+        # The reader's own key first, the server's as fallback; needs_key with
+        # neither is enabled but unusable, so this provider stays silent instead of
+        # failing every search it takes part in.
+        user_key = (provider_keys or {}).get(provider_id, "").strip()
+        usable = bool(user_key) or bool(_provider_key(provider_id))
+        if _PROVIDERS_BY_ID[provider_id].needs_key and not usable:
             continue
         try:
-            result.candidates += query_func(raw, isbn, limit)
+            result.candidates += query_func(raw, isbn, limit, user_key or None)
         except httpx.HTTPError as exc:
             # Named, not retried somewhere else. It ends this provider's turn and
             # nothing more: a second provider the reader enabled still answers.
@@ -140,7 +152,11 @@ def search(
     return result
 
 
-def _open_library(raw: str, isbn: str | None, limit: int) -> list[Candidate]:
+def _open_library(
+    raw: str, isbn: str | None, limit: int, provider_key: str | None = None
+) -> list[Candidate]:
+    # Open Library needs no key, so `provider_key` is accepted for the shared
+    # signature and ignored — the registry offers every provider the same call.
     params: dict[str, str | int] = {"limit": limit, "fields": _OL_FIELDS}
     params["isbn"] = isbn if isbn else None
     if isbn is None:
@@ -213,8 +229,14 @@ def _candidate_from_ol(document: dict) -> Candidate | None:
     )
 
 
-def _google_books(raw: str, isbn: str | None, limit: int) -> list[Candidate]:
-    params: dict[str, str | int] = {"maxResults": limit, "key": settings.google_books_key}
+def _google_books(
+    raw: str, isbn: str | None, limit: int, provider_key: str | None = None
+) -> list[Candidate]:
+    # The reader's own key when they pasted one in Settings, else the server's.
+    params: dict[str, str | int] = {
+        "maxResults": limit,
+        "key": provider_key or settings.google_books_key,
+    }
     # Same rule as Open Library: an ISBN is searched exactly, anything else is
     # the free-text title/author query.
     params["q"] = f"isbn:{isbn}" if isbn else raw
@@ -260,8 +282,9 @@ def _google_books(raw: str, isbn: str | None, limit: int) -> list[Candidate]:
 
 
 # One query function per provider id, every one of them taking
-# (raw query, normalised isbn or None, limit) and returning candidates.
-_QUERY_FUNCS: dict[str, Callable[[str, str | None, int], list[Candidate]]] = {
+# (raw query, normalised isbn or None, limit, the reader's own key or None) and
+# returning candidates.
+_QUERY_FUNCS: dict[str, Callable[[str, str | None, int, str | None], list[Candidate]]] = {
     "openlibrary": _open_library,
     "googlebooks": _google_books,
 }

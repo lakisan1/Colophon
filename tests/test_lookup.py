@@ -180,6 +180,66 @@ def test_google_books_is_not_called_without_a_key(monkeypatch: pytest.MonkeyPatc
     assert hosts == ["openlibrary.org"]  # no second provider is reached
 
 
+def test_a_readers_own_key_reaches_the_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A key pasted on the settings page works with no server key at all."""
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", None)
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["host"] = request.url.host
+        seen["key"] = request.url.params.get("key", "")
+        return httpx.Response(200, json={"items": []})
+
+    _install(monkeypatch, handler)
+    search("Dune", providers=("googlebooks",), provider_keys={"googlebooks": "userkey"})
+
+    assert seen["host"] == "www.googleapis.com"
+    assert seen["key"] == "userkey"
+
+
+def test_a_readers_own_key_wins_over_the_server_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "server-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["key"] = request.url.params.get("key", "")
+        return httpx.Response(200, json={"items": []})
+
+    _install(monkeypatch, handler)
+    search("Dune", providers=("googlebooks",), provider_keys={"googlebooks": "userkey"})
+
+    assert seen["key"] == "userkey"
+
+
+def test_a_blank_personal_key_falls_back_to_the_server_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty input means "no personal key", not "send an empty key"."""
+    from app.settings import settings
+
+    monkeypatch.setattr(settings, "google_books_key", "server-key")
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["key"] = request.url.params.get("key", "")
+        return httpx.Response(200, json={"items": []})
+
+    _install(monkeypatch, handler)
+    search(
+        "Dune",
+        providers=("googlebooks",),
+        provider_keys={"googlebooks": "   ", "openlibrary": "ignored"},
+    )
+
+    assert seen["key"] == "server-key"
+
+
 def test_google_books_results_are_parsed_when_a_key_is_set(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.settings import settings
 

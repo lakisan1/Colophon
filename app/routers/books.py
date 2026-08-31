@@ -1046,8 +1046,15 @@ def _render_form(
         # warning asks about "Height 900 mm", so the field must show 900 —
         # otherwise the page confirms a value it does not display.
         values.update(outcome.values)
+    # One read of the reader's prefs: which providers they opted into, and the
+    # personal API keys that make a keyed provider answerable at all.
+    prefs = page_prefs(request)
     lookup = (
-        search(lookup_query, providers=page_prefs(request).search_providers)
+        search(
+            lookup_query,
+            providers=prefs.search_providers,
+            provider_keys=prefs.provider_keys,
+        )
         if lookup_query
         else None
     )

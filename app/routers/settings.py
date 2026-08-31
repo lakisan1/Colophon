@@ -6,6 +6,7 @@
 # reason someone changes a password.
 from __future__ import annotations
 
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -76,6 +77,19 @@ async def update_settings(
         enabled = ["openlibrary"]
     search_providers = ",".join(enabled)
 
+    # A keyed provider takes one password input per registry id, so a provider
+    # added to app/lookup.py gets its own key field without a column, a migration or
+    # a line here. An empty input stores no key — which means "use the server's",
+    # not "use an empty one", so blanks are dropped rather than saved.
+    provider_keys = {
+        spec.id: (values.get(f"provider_key_{spec.id}") or "").strip()
+        for spec in PROVIDERS
+        if spec.needs_key
+    }
+    provider_keys_json = json.dumps(
+        {pid: key for pid, key in provider_keys.items() if key}, separators=(",", ":")
+    )
+
     if theme not in THEMES:
         errors.append(f"Theme must be one of: {', '.join(THEMES)}.")
     if zoom not in ZOOM_ROW_PX:
@@ -91,7 +105,15 @@ async def update_settings(
         return _render(request, session, user, notice=None, errors=errors)
 
     _upsert_prefs(
-        session, user.id, currency, date_format, time_format, theme, zoom, search_providers
+        session,
+        user.id,
+        currency,
+        date_format,
+        time_format,
+        theme,
+        zoom,
+        search_providers,
+        provider_keys_json,
     )
     # The page must show what was just saved: the request cached its prefs before
     # this write (in current_user), so re-read them before rendering.
@@ -229,13 +251,15 @@ def _upsert_prefs(
     theme: str,
     zoom: str,
     search_providers: str,
+    provider_keys: str,
 ) -> None:
     updated = session.execute(
         text(
             """
             UPDATE settings
             SET currency_symbol = :currency, date_format = :date_format, time_format = :time_format,
-                theme = :theme, zoom_preset = :zoom, search_providers = :search_providers
+                theme = :theme, zoom_preset = :zoom, search_providers = :search_providers,
+                provider_keys = :provider_keys
             WHERE owner_id = :owner_id
             """
         ),
@@ -246,6 +270,7 @@ def _upsert_prefs(
             "theme": theme,
             "zoom": zoom,
             "search_providers": search_providers,
+            "provider_keys": provider_keys,
             "owner_id": owner_id,
         },
     )
@@ -255,9 +280,9 @@ def _upsert_prefs(
                 """
                 INSERT INTO settings
                     (owner_id, currency_symbol, date_format, time_format, theme, zoom_preset,
-                     search_providers)
+                     search_providers, provider_keys)
                 VALUES (:owner_id, :currency, :date_format, :time_format, :theme, :zoom,
-                        :search_providers)
+                        :search_providers, :provider_keys)
                 """
             ),
             {
@@ -267,6 +292,7 @@ def _upsert_prefs(
                 "theme": theme,
                 "zoom": zoom,
                 "search_providers": search_providers,
+                "provider_keys": provider_keys,
                 "owner_id": owner_id,
             },
         )

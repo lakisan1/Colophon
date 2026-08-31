@@ -4,6 +4,7 @@
 # preset (A2) and a theme.
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from sqlalchemy import text
@@ -12,7 +13,9 @@ from sqlalchemy.orm import Session
 from app.shelf import DEFAULT_ZOOM
 
 # Column order shared by the two lookups below.
-_COLUMNS = "currency_symbol, date_format, time_format, theme, zoom_preset, search_providers"
+_COLUMNS = (
+    "currency_symbol, date_format, time_format, theme, zoom_preset, search_providers, provider_keys"
+)
 
 DEFAULTS = {
     "currency_symbol": "€",
@@ -23,6 +26,9 @@ DEFAULTS = {
     # Open Library needs no key and no configuration, so it is the provider
     # everybody gets; anything else is opted into on the settings page.
     "search_providers": "openlibrary",
+    # A JSON object of provider id -> key, empty by default: the server's own
+    # environment key is what a reader without one falls back to.
+    "provider_keys": "",
 }
 
 
@@ -36,6 +42,7 @@ class Prefs:
     theme: str
     zoom_preset: str
     search_providers: frozenset[str]
+    provider_keys: dict[str, str]
 
 
 def parse_providers(raw: object) -> frozenset[str]:
@@ -49,14 +56,40 @@ def parse_providers(raw: object) -> frozenset[str]:
     return frozenset(part.strip() for part in str(raw or "").split(",") if part.strip())
 
 
+def parse_provider_keys(raw: object) -> dict[str, str]:
+    """Turn the stored JSON object of provider id -> key into a plain dict.
+
+    One column rather than one per provider so a new keyed provider costs a
+    registry entry in app/lookup.py and no migration. Anything that is not a JSON
+    object reads as "no personal keys" — a hand-edited or half-written column must
+    not break every page that renders prefs, and an empty value is no key either,
+    so it is dropped rather than kept as a key that cannot work.
+    """
+    if raw is None or str(raw).strip() == "":
+        return {}
+    try:
+        parsed = json.loads(str(raw))
+        if not isinstance(parsed, dict):
+            return {}
+        return {
+            str(provider_id): str(key)
+            for provider_id, key in parsed.items()
+            if str(key or "").strip()
+        }
+    except (TypeError, ValueError):
+        return {}
+
+
 def default_prefs() -> Prefs:
     """Prefs straight out of DEFAULTS, for a request that read no row.
 
-    DEFAULTS holds column-shaped values, so the provider string is parsed here
-    rather than at every caller that has no owner or no settings table.
+    DEFAULTS holds column-shaped values, so the provider string and the key JSON
+    are parsed here rather than at every caller that has no owner or no settings
+    table.
     """
     defaults = dict(DEFAULTS)
     defaults["search_providers"] = parse_providers(defaults["search_providers"])
+    defaults["provider_keys"] = parse_provider_keys(defaults.get("provider_keys"))
     return Prefs(**defaults)
 
 
@@ -71,6 +104,8 @@ def load_prefs(session: Session, owner_id: int) -> Prefs:
     }
     # Comma-separated in the column, a set everywhere else (see parse_providers).
     values["search_providers"] = parse_providers(values.get("search_providers"))
+    # JSON object in the column, a dict everywhere else (see parse_provider_keys).
+    values["provider_keys"] = parse_provider_keys(values.get("provider_keys"))
     return Prefs(**values)
 
 

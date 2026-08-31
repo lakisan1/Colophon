@@ -4,6 +4,7 @@
 # assumed. Time is injected everywhere so no test sleeps.
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -593,10 +594,120 @@ def test_a_enabled_provider_without_a_key_is_flagged_on_the_page(
         data={"csrf_token": token, **_SETTINGS_FIELDS, "provider_googlebooks": "1"},
     )
 
-    assert "no API key is configured" in auth_client.get("/settings").text
+    assert "no API key is set" in auth_client.get("/settings").text
 
     monkeypatch.setattr(settings, "google_books_key", "test-key")
-    assert "no API key is configured" not in auth_client.get("/settings").text
+    assert "no API key is set" not in auth_client.get("/settings").text
+
+
+def _stored_provider_keys(engine: Engine) -> str:
+    with engine.connect() as conn:
+        return str(
+            conn.execute(
+                text(
+                    "SELECT provider_keys FROM settings "
+                    "WHERE owner_id = (SELECT id FROM users WHERE username = 'admin')"
+                )
+            ).scalar_one()
+        )
+
+
+def test_settings_offers_a_key_field_per_keyed_provider(auth_client: TestClient) -> None:
+    """The registry decides who gets a key input; the template knows no provider id."""
+    sign_in(auth_client)
+    page = auth_client.get("/settings")
+
+    assert "Google Books API key" in page.text
+    assert 'name="provider_key_googlebooks"' in page.text
+    # Open Library needs no key, so it gets no field asking for one.
+    assert 'name="provider_key_openlibrary"' not in page.text
+
+
+def test_a_pasted_api_key_is_stored_and_prefilled(
+    auth_client: TestClient, auth_engine: Engine
+) -> None:
+    """The key is per-user, on the owner's own settings row, and comes back."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
+    saved = auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_googlebooks": "1",
+            "provider_key_googlebooks": "  AIza-user-key  ",
+        },
+    )
+
+    assert saved.status_code == 200
+    assert json.loads(_stored_provider_keys(auth_engine)) == {"googlebooks": "AIza-user-key"}
+
+    again = auth_client.get("/settings")
+    assert 'name="provider_key_googlebooks" value="AIza-user-key"' in again.text
+    # It is a password field: the value is not readable as plain text in the label.
+    assert 'type="password" name="provider_key_googlebooks"' in again.text
+
+
+def test_a_blank_api_key_is_never_stored(auth_client: TestClient, auth_engine: Engine) -> None:
+    """Blank means "no personal key, use the server's", so nothing is kept."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+
+    auth_client.post(
+        "/settings",
+        data={"csrf_token": token, **_SETTINGS_FIELDS, "provider_googlebooks": "1"},
+    )
+    assert json.loads(_stored_provider_keys(auth_engine)) == {}
+
+    auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_googlebooks": "1",
+            "provider_key_googlebooks": "AIza-user-key",
+        },
+    )
+    assert json.loads(_stored_provider_keys(auth_engine)) == {"googlebooks": "AIza-user-key"}
+
+    # Clearing the field on a later save clears the stored key rather than keeping it.
+    auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_googlebooks": "1",
+            "provider_key_googlebooks": "   ",
+        },
+    )
+    assert json.loads(_stored_provider_keys(auth_engine)) == {}
+
+
+def test_a_personal_key_silences_the_missing_key_hint(
+    auth_client: TestClient, auth_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With their own key pasted in, the reader is no longer told nothing is set."""
+    sign_in(auth_client)
+    token = _csrf_from(auth_client.get("/settings").text)
+    monkeypatch.setattr(settings, "google_books_key", None)
+
+    auth_client.post(
+        "/settings",
+        data={"csrf_token": token, **_SETTINGS_FIELDS, "provider_googlebooks": "1"},
+    )
+    assert "no API key is set" in auth_client.get("/settings").text
+
+    auth_client.post(
+        "/settings",
+        data={
+            "csrf_token": token,
+            **_SETTINGS_FIELDS,
+            "provider_googlebooks": "1",
+            "provider_key_googlebooks": "AIza-user-key",
+        },
+    )
+    assert "no API key is set" not in auth_client.get("/settings").text
 
 
 def test_a_search_always_has_somebody_to_ask(auth_client: TestClient, auth_engine: Engine) -> None:
