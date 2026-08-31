@@ -44,12 +44,13 @@ html, body {
   color: var(--ink-muted);
   text-decoration: none;
   font-size: 0.85rem;
+  font-weight: 400;
 }
 
-.site-nav a:hover { color: var(--ink); background: var(--paper); }
+.site-nav a:hover { color: var(--ink-muted); background: var(--paper-raised); }
 
 .site-nav a[aria-current="page"],
-.site-nav a.active { color: var(--ink); background: var(--paper); }
+.site-nav a.active { color: var(--ink); background: var(--paper-raised); }
 
 .site-main {
   max-width: 76rem;
@@ -143,8 +144,8 @@ html, body {
 
 .btn-primary {
   border-color: var(--focus-ring);
-  background: var(--focus-ring);
-  color: #fff;
+  background: color-mix(in srgb, var(--focus-ring) 24%, var(--paper-raised));
+  color: var(--ink);
 }
 
 .btn-danger {
