@@ -88,6 +88,7 @@ html, body {
 .page-head h1, .page-head h2 {
   margin: 0;
   font-size: 1.35rem;
+  color: var(--ink-muted);
 }
 
 .page-head .page-count { color: var(--ink-muted); font-size: 0.9rem; }
