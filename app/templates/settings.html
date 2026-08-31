@@ -76,6 +76,18 @@
       <p class="form-actions"><button type="submit" class="btn btn-primary">Change password</button></p>
     </form>
 
+    <form class="card" method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
+      <fieldset>
+        <legend>User</legend>
+        <div class="field">
+          <span class="label">Logged in as</span>
+          <span>{{ user.username }}</span>
+        </div>
+      </fieldset>
+      <p class="form-actions"><button type="submit" class="btn">Sign out</button></p>
+    </form>
+
     {% if user.is_admin %}
     <form class="card" method="post" action="/settings/users/new">
       <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
@@ -122,10 +134,5 @@
       </ul>
     </div>
     {% endif %}
-
-    <form method="post" action="/logout">
-      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
-      <p class="form-actions"><button type="submit" class="btn">Sign out</button></p>
-    </form>
   </div>
 {% endblock %}
