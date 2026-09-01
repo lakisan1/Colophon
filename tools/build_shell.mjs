@@ -147,29 +147,27 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid var(--wood-shelf-dark);
-  border-radius: 5px;
-  background: var(--paper);
+  padding: 0.32rem 0.68rem;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink-muted) 16%, transparent);
   color: var(--ink);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   cursor: pointer;
   text-decoration: none;
   transition: filter 160ms ease, transform 160ms ease;
 }
 
-.btn:hover { filter: brightness(1.04); }
+.btn:hover { background: color-mix(in srgb, var(--ink-muted) 28%, transparent); }
 .btn:active { transform: translateY(1px); }
 
 .btn-primary {
-  border-color: var(--focus-ring);
-  background: color-mix(in srgb, var(--focus-ring) 24%, var(--paper-raised));
+  background: color-mix(in srgb, var(--focus-ring) 34%, transparent);
   color: var(--ink);
 }
 
 .btn-danger {
-  border-color: var(--danger, #a33);
-  background: var(--danger, #a33);
+  background: color-mix(in srgb, var(--danger, #a33) 36%, transparent);
   color: #fff;
 }
 
