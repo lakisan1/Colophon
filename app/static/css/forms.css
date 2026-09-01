@@ -99,20 +99,6 @@ input[type="radio"] {
 
 .form-actions { display: flex; gap: 0.6rem; margin: 0; }
 
-.notices,
-.errors {
-  list-style: none;
-  margin: 0;
-  padding: 0.6rem 0.9rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-
-.notices { background: color-mix(in srgb, var(--cloth-sand) 35%, var(--paper)); }
-.errors { background: color-mix(in srgb, var(--cloth-crimson) 22%, var(--paper)); }
-
-.hint { font-size: 0.78rem; color: var(--ink-muted); }
-
 /* ---------- settings: search providers ----------
  * One provider is one row of the fieldset grid: the checkbox spans the row, and a
  * keyed provider's key field spans the row beneath it, indented by the width of a
@@ -123,14 +109,6 @@ input[type="radio"] {
 /* The registry's description link sits under its checkbox, indented the same way,
    so one provider reads as one block: name, what it is, key. */
 .provider-note { margin-left: 1.45rem; }
-
-/* A lookup nobody can answer (every provider off) is disabled rather than hidden,
-   so it must still look like the button it is — just not a live one. */
-.btn:disabled,
-input:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
 
 /* Admin: user-management list. */
 .user-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.9rem; }

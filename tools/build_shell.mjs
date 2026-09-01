@@ -94,12 +94,27 @@ html, body {
 .page-head .page-count { color: var(--ink-muted); font-size: 0.9rem; }
 
 /* --- cards -------------------------------------------------------------- */
-.card {
-  background: var(--paper-raised);
-  border: 1px solid var(--wood-shelf);
-  border-radius: 14px;
-  padding: clamp(1rem, 2vw, 1.5rem);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+/* Shared feedback: save/error notices and helper text live here (loaded on every
+   page) rather than being redefined per-page in forms.css / shelf.css. */
+.notices,
+.errors {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.notices { background: color-mix(in srgb, var(--cloth-sand) 35%, var(--paper)); }
+.errors { background: color-mix(in srgb, var(--cloth-crimson) 22%, var(--paper)); }
+
+.hint { font-size: 0.78rem; color: var(--ink-muted); }
+
+.btn:disabled,
+input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .card-title {
