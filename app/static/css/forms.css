@@ -94,22 +94,8 @@ input[type="radio"] {
   font-size: 0.88rem;
 }
 
-.btn {
-  display: inline-block;
-  padding: 0.4rem 0.85rem;
-  font-size: 0.85rem;
-  text-decoration: none;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--wood-shelf-dark);
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-.btn:hover { background: var(--paper-raised); }
-.btn-primary { background: var(--wood-shelf); border-color: var(--wood-shelf-dark); }
-.btn-small { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
-.btn-quiet { color: var(--ink-muted); }
+/* Buttons live in shell.css (the shared chrome) so the same .btn/.btn-primary
+   style applies on every page — forms.css does not redefine them. */
 
 .form-actions { display: flex; gap: 0.6rem; margin: 0; }
 

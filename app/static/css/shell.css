@@ -155,6 +155,9 @@ html, body {
   color: #fff;
 }
 
+.btn-small { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
+.btn-quiet { color: var(--ink-muted); }
+
 /* The "Menu" button is only for narrow screens. On a wide viewport the nav is
    always visible, so the toggle must disappear; the max-width block below
    brings it back. Placed after .btn so it overrides the button's display.

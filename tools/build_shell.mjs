@@ -173,6 +173,9 @@ html, body {
   color: #fff;
 }
 
+.btn-small { padding: 0.25rem 0.6rem; font-size: 0.78rem; }
+.btn-quiet { color: var(--ink-muted); }
+
 /* --- banner ------------------------------------------------------------- */
 .banner {
   margin: 0 0 1rem;
