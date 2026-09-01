@@ -129,13 +129,12 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.5rem 0.85rem;
-  border: 1px solid var(--wood-shelf);
-  border-radius: 10px;
-  background: var(--paper-raised);
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--wood-shelf-dark);
+  border-radius: 5px;
+  background: var(--paper);
   color: var(--ink);
-  font: inherit;
-  font-weight: 550;
+  font-size: 0.85rem;
   cursor: pointer;
   text-decoration: none;
   transition: filter 160ms ease, transform 160ms ease;
