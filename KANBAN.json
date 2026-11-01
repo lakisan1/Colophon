@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "cards": [
+    {
+      "id": "card-febf336c-2bf3-479a-95a3-fb0c127c8f9a",
+      "title": "Purge milestone/agent-era leftovers from docs, comments, and tooling",
+      "rationale": "The milestone/agent-era process artifacts (M0–M8 tags, \"local git only, never push\", dead doc references, doctor.sh STATE/heartbeat machinery, T13 automation rules) describe a workflow that no longer exists and mislead readers; user requested full cleanup after orientation.",
+      "rejected": "Considered deleting doctor.sh entirely and rewriting git history to purge milestone commit messages — rejected: the schema-drift check is genuinely useful, and history is an immutable record. Considered keeping T13 as a historical decision — rejected per the user's explicit choice of full cleanup; recoverable from git.",
+      "sourceSessionId": "session-f01fca4d-5b96-40d2-91ad-c6a417bc28ca",
+      "status": "done",
+      "tags": [
+        "cleanup",
+        "docs",
+        "tooling"
+      ],
+      "createdAt": 1788339830314,
+      "updatedAt": 1788340970114,
+      "summary": "Purged milestone/agent-era leftovers across 45 tracked files: rewrote docs/DECISIONS.md (fixed the corrupted T12/Engineering-culture fusion, deleted T13, removed [ASSUMPTION]/\"veto\" language, fixed the regenres.py typo, replaced \"local git only, never push\" with \"Development happens on GitHub\"); cleaned docs/SPEC.md (dead PLAN/GITHUB/ASSUMPTIONS references, removed §16 Build order, assumption flags); stripped STATE.json/heartbeat logic from scripts/doctor.sh and dropped the `make beat` target (kept git-dirty, schema-drift, and test-gate checks); removed all M0–M8 tags from app/, templates, static CSS/JS, tests/, and alembic docstrings. Verified: zero-remaining grep, py_compile on all 31 edited Python files, bash -n on doctor.sh. Note written at .agents/notes/implemented/simplification/2026-09-02-milestone-era-artifact-purge.md."
+    },
+    {
+      "id": "card-26ff6264-0174-416e-9096-76ab59c99f46",
+      "title": "Build venv, migrate, seed; green pytest/ruff baseline",
+      "rationale": "Baseline had to exist before any testing or fixes; deps are exactly the pinned freeze so results match the project's contract.",
+      "sourceSessionId": "session-f01fca4d-5b96-40d2-91ad-c6a417bc28ca",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "setup"
+      ],
+      "createdAt": 1788341367440,
+      "updatedAt": 1788341367440,
+      "summary": "Installed the pinned toolchain into .venv (ensurepip was missing, so pip was bootstrapped via get-pip.py), ran `alembic upgrade head` (0001→0014), seeded the 210-book demo library, and got a green baseline: ruff clean, 456/456 tests after fixing the one environment-dependent failure (FTS temp-btree spill).",
+      "rejected": "Considered running the app from system python — impossible (no packages); considered ignoring the failing seed test as sandbox noise — rejected after proving it reproduced identically at HEAD and fixing the root cause (temp_store pragma)."
+    },
+    {
+      "id": "card-2755a2e0-0f52-47b3-af57-4aa3f17e1d80",
+      "title": "Remove dead code and fix the README quickstart gap",
+      "rationale": "All names were grep+AST-verified unreferenced across app/, tests/, templates, docs; the README quickstart as written 500s on a fresh clone because nothing calls create_all.",
+      "sourceSessionId": "session-f01fca4d-5b96-40d2-91ad-c6a417bc28ca",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "dead-code"
+      ],
+      "createdAt": 1788341367454,
+      "updatedAt": 1788341367454,
+      "summary": "Removed purge_expired_sessions, csrf_input(), count_books(), DEFAULT_USERNAME, the empty {% if %} remnant in book_form.html, and the unused itsdangerous + python-dotenv pins (verified Required-by: empty); fixed README quickstart to include `make migrate`.",
+      "rejected": "Left `purge_expired_sessions`-style session-purge machinery out deliberately — expiry cleanup stays lazy via load_session, matching shipped behavior."
+    },
+    {
+      "id": "card-cffcae59-72e3-4c65-8adf-4556958333e1",
+      "title": "Audit security as if public-facing and fix real findings",
+      "rationale": "User asked for public-facing security; the audit found one high (SSRF), two medium and several low/info issues, all fixed with minimal diffs consistent with the plain-SQL/no-framework culture.",
+      "sourceSessionId": "session-f01fca4d-5b96-40d2-91ad-c6a417bc28ca",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "security"
+      ],
+      "createdAt": 1788341367466,
+      "updatedAt": 1788341367466,
+      "summary": "Static audit (subagent) + fixes for: SSRF via cover_url (host allowlist in fetch_provider_cover + regression test), /book/lookup unauthenticated, missing CSRF on both photo routes, unbounded upload RAM read, login_attempts unbounded growth, username-enumeration timing (dummy bcrypt), non-timing-safe CSRF compares, cross-tenant room_id, junk-genre FK 500, /openapi.json exposure, missing X-Frame-Options, missing Cache-Control: private on photos, sync-blocking async handlers (login/create/edit/lookup now run in the threadpool), demo/demo invisible to the D11 banner, dead COLOPHON_SECRET_KEY config removed everywhere (it was never read — sessions are DB tokens), login_attempts pruning.",
+      "rejected": "Deliberately NOT changed (owner's calls): provider API key echoed back on the settings page (own key, own session, autoescaped), lazy-only expired-session purge, banner dismiss button (D11 says non-hideable — letter-vs-intent call), no pagination on shelf/export queries (self-DoS only at personal-library scale), add_photo's Pillow work still runs on the event loop (bounded, post-auth)."
+    },
+    {
+      "id": "card-7ea63a9e-2e3b-431b-8aa2-797f09f59a26",
+      "title": "Smoke-test the running app end-to-end with curl",
+      "rationale": "Static review cannot prove the auth/CSRF/lockout behavior the code claims; the audit's severity calls depended on live behavior.",
+      "sourceSessionId": "session-f01fca4d-5b96-40d2-91ad-c6a417bc28ca",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "testing"
+      ],
+      "createdAt": 1788341367478,
+      "updatedAt": 1788341367478,
+      "summary": "Ran the real (login-enforced) server on :8321 and verified: healthz, 303-redirects for every unauthenticated page incl. /book/lookup and /export, static traversal 404, login CSRF pairing, generic failure message, cookie flags (HttpOnly/SameSite=Lax), successful login, shelf render, live Open Library lookup, mutation-without-CSRF 403, XSS probe stored-and-escaped (0 raw <script>), photo route auth, password-confirmed book deletion, 5-strike lockout (right password still refused), unlock CLI recovery, nosniff on every response, startup warning for unset COLOPHON_SECRET_KEY (later removed with the dead config).",
+      "rejected": "First lockout attempt was invalid (CSRF-less failures are rejected before record_failure) — redone with properly paired tokens; probe book deleted afterwards."
+    },
+    {
+      "id": "card-d3ef7254-3ad4-4114-9878-f0a08cdc43f1",
+      "title": "Recon + baseline: read prior hardening pass, run full suite",
+      "summary": "Read the 2026-09-02 hardening note and all security-critical files (auth, deps, cookies, routers, uploads, lookup, db, main, compose/Dockerfile/Makefile). Baseline: 457 tests passed, ruff clean.",
+      "rationale": "A prior hardening pass exists; the new work must go deeper for the public-domain threat model instead of repeating it. Baseline must be green before changes.",
+      "rejected": "Re-auditing already-fixed items (SSRF allowlist, CSRF double-submit, lockout) as primary work — they are pinned by tests already.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296834,
+      "updatedAt": 1788617296834
+    },
+    {
+      "id": "card-da6292ab-d5b3-4dc4-a3cd-b3a1afaf06f3",
+      "title": "Audit: auth, sessions, multi-user isolation, invite-only invariants",
+      "rationale": "App goes on a public domain with no public signup: any user-creation path reachable without an admin, any cross-user data leak, or any admin route missing is_admin is directly exploitable by internet strangers.",
+      "rejected": "Subagent completion — repeated empty-turn stalls and failures on the local model; the areas were small enough to finish directly with better reliability.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296841,
+      "updatedAt": 1788631415873,
+      "summary": "Assigned subagent failed three times; the coordinator took over. VERDICT: the app already satisfies the invite-only threat model — no code changes needed, the contracts are now pinned by tests. Verified with tests/hardening/test_hardening_auth.py (12 tests): non-admin and anonymous account create/delete silently refused (303) with no user rows created; admin account undeletable and self-delete blocked; is_admin never grantable via any form; cross-user book page/edit/photo/exports all 404 with mutation routes (both delete paths) refusing; login always mints a fresh session id; delete_user removes photo files, owned rows (FK cascade), throttle history and deadens the deleted user's cookie (re-login 401)."
+    },
+    {
+      "id": "card-c243936c-4410-4b3c-a32b-c4c51b51eafd",
+      "title": "Audit: file handling — uploads, photos, export, backup",
+      "rationale": "Photos are user bytes served back to browsers; filenames cross the DB/disk boundary; export produces CSV a spreadsheet executes. All are classic public-deployment exploit paths.",
+      "rejected": "Rewriting _media_type to a stricter image-only allowlist — octet-stream + global nosniff already makes unknown types inert, and an extra refusal path risks breaking provider-cover caching filenames.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296846,
+      "updatedAt": 1788632504994,
+      "summary": "Assigned subagent stalled repeatedly; coordinator took over. VERDICT: already hardened — read_upload/delete_upload refuse path-like names (traversal cannot escape upload_dir even via tampered DB rows); save_upload validates by sniffed format, caps pixels (25M, bomb → UploadError), bounds crop boxes, strips EXIF, names files itself; _media_type falls back to application/octet-stream so a tampered photo row can never serve text/html or svg; _csv_cell implements the CWE-1236 quote-prefix mitigation; Content-Disposition is a fixed colophon-YYYY-MM-DD.csv; the backup dir is not reachable from any route. Pinned by tests/hardening/test_hardening_files.py (6 tests)."
+    },
+    {
+      "id": "card-ffe4aab0-ae5b-4446-b33d-9411c00e039e",
+      "title": "Audit: network egress and SSRF (lookup + cover fetch)",
+      "rationale": "fetch_provider_cover follows redirects after an allowlist check — an open redirect on an allowed host is a live SSRF channel; cover bytes are read unbounded into RAM. Both matter on a public box.",
+      "rejected": "Subagent completion — repeated empty-turn stalls and failures on the local model; the areas were small enough to finish directly with better reliability.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296851,
+      "updatedAt": 1788631415880,
+      "summary": "Assigned subagent failed three times; the coordinator took over. REAL FINDINGS in app/lookup.py fetch_provider_cover, all fixed: (1) redirects were followed blind after the initial host check — a 302 from an allowed provider host to http://169.254.169.254/ was fetched (SSRF); now redirects are followed one hop at a time with the allowlist re-checked per hop and relative Locations resolved via urljoin; (2) response bytes were read unbounded into the single worker's RAM — now capped at MAX_COVER_BYTES (10 MB); (3) plain-http cover fetches allowed — now https-only. tests/hardening/test_hardening_net.py: 13 tests (redirect refusal incl. scheme-relative and loop abandon, size cap, https-only, 6 parametrized allowlist edges, /book/lookup input bounds and exact whitelisted JSON key set). test_lookup.py regression: green."
+    },
+    {
+      "id": "card-d0fcbe4e-a7b9-473d-8ea3-81b73f2750cc",
+      "title": "Audit: SQL injection, template XSS, unsafe rendering",
+      "rationale": "Every query is text() SQL and every page is Jinja2; one f-string SQL or one |safe on user input is a full compromise of the multi-user DB on a public domain.",
+      "rejected": "Rejecting javascript: cover URLs at save time — the value is server-side only (provider-cache input) and never rendered into a navigational attribute; a save-time rejection would add an error path for no browser-reachable risk.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296856,
+      "updatedAt": 1788632505001,
+      "summary": "Assigned subagent stalled repeatedly; coordinator took over. VERDICT: no exploitable findings — Jinja2 autoescape is on and no |safe escapes it; every dynamic SQL value is bound and dynamic identifiers come from server-side whitelists; FTS input is tokenized, quoted (doubled quotes) and bound as :fts_match; the spine style attributes carry server-computed integers only; static JS has no innerHTML/insertAdjacentHTML/document.write sinks; cover_url never reaches an href/src. Pinned by tests/hardening/test_hardening_injection.py (19 HTTP-layer probes: hostile title/authors/tags/cover_url across shelf, book, edit pages; 14 filter-parameter SQL/FTS probes asserting 200 + intact table)."
+    },
+    {
+      "id": "card-f7f98546-0560-4745-8179-66bd25d1cc49",
+      "title": "Audit: public deployment config — proxy headers, CSP, headers, Docker",
+      "rationale": "Behind a reverse proxy without --proxy-headers, every user shares the proxy IP: 5 failed logins lock out the whole site (lockout is keyed per IP). CSP and Referrer-Policy are still missing; the compose file must not invite dev-bypass or weak cookie settings into production.",
+      "rejected": "A runtime warning when cookie_secure is off — noisy on every local/dev run; the README deployment checklist plus the HSTS-when-secure contract cover it. Subagent-completed deploy audit — two empty-turn stalls; doing it centrally was faster and kept file ownership clean.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296861,
+      "updatedAt": 1788626475175,
+      "summary": "The assigned subagent stalled twice with empty turns, so the coordinator took the area over directly. Findings applied: (1) uvicorn started without --proxy-headers in Dockerfile CMD and make serve — behind a reverse proxy every visitor shares the proxy IP, so the per-IP login lockout (5 failures/15 min) becomes a site-wide lockout an attacker can hold forever; flag added to both start commands, FORWARDED_ALLOW_IPS documented in compose. (2) Missing headers: CSP (default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' for spine style attrs; img-src 'self' data:; object-src/base-uri/frame-ancestors none; form-action 'self'), Referrer-Policy, Permissions-Policy, HSTS only when COLOPHON_COOKIE_SECURE=1, and private/no-store on all non-static responses (per-reader pages must not be cacheable by shared proxies). The two inline <script> blocks (login pre-paint theme, settings provider confirm) moved to static/js/login.js and static/js/settings.js so script-src 'self' holds without unsafe-inline; tests/test_auth.py updated to pin the externalized contract. New tests/hardening/test_hardening_deploy.py: 8 tests, all passing; ruff clean."
+    },
+    {
+      "id": "card-efa682b3-1803-4404-a0b9-68f574e1b222",
+      "title": "Consolidate audit findings and apply fixes",
+      "rationale": "Subagents are read-only on app code to avoid conflicting edits; fixes land centrally so diffs stay minimal and consistent with the project's plain-SQL style.",
+      "rejected": "Runtime startup warnings for cookie_secure-off — noisy in every dev run; the README checklist plus HSTS-when-secure contract covers the gap.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296867,
+      "updatedAt": 1788632505008,
+      "summary": "Findings applied, all verified by the full suite (514 passed, was 457): (1) HIGH — fetch_provider_cover followed redirects blind after the initial host check (open redirect on a provider host = SSRF); now re-validates every hop against the allowlist with relative Locations resolved; (2) MED — cover responses read unbounded into the single worker's RAM; now capped at 10 MB; (3) MED — plain-http cover fetches allowed; now https-only; (4) MED — uvicorn ran without --proxy-headers in the Dockerfile CMD and make serve, which behind a reverse proxy keys the per-IP login lockout on the proxy IP (site-wide lockout DoS); flag added to both start commands with FORWARDED_ALLOW_IPS documented; (5) MED — the public login page hard-coded demo/demo credentials; the hint now shows only while a default-password demo account exists, guarded so a pre-migration database cannot 500 the page; (6) headers — CSP (script-src 'self', no unsafe-inline), Referrer-Policy, Permissions-Policy, HSTS only when COLOPHON_COOKIE_SECURE=1, private/no-store on all non-static responses; the two inline <script> blocks moved to static/js so the CSP holds."
+    },
+    {
+      "id": "card-12f745d3-e532-45f6-bc83-494ceeb12c72",
+      "title": "Merge hardening test files; full suite + ruff green",
+      "rationale": "Hardening tests only count if the whole suite stays green with them; the final gate is pytest -q + ruff check on everything.",
+      "rejected": "Keeping the subagents' stalled half-deliverables — none reached disk; every file in tests/hardening/ is coordinator-authored and verified.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296872,
+      "updatedAt": 1788632505015,
+      "summary": "tests/hardening/ now carries 5 contract files: test_hardening_auth.py (12), test_hardening_net.py (13), test_hardening_files.py (6), test_hardening_injection.py (19), test_hardening_deploy.py (10) — 57 new tests, 514 total passing in 6m48s, ruff clean across the repo. Existing suite updated only where behavior legitimately moved: tests/test_auth.py now pins the externalized settings-confirm script instead of the removed inline block."
+    },
+    {
+      "id": "card-4f044055-6b57-4d58-94c4-dd222657155a",
+      "title": "Write public-domain deployment checklist into README/docs",
+      "rationale": "The owner will expose this on a real domain: TLS + COLOPHON_COOKIE_SECURE=1, FORWARDED_ALLOW_IPS, no dev bypass, change demo/admin passwords, backups — must be written where the owner will read it.",
+      "rejected": "A separate docs/deployment.md — the README Environment section is where the owner actually looks; a second file would drift.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "public-deploy"
+      ],
+      "createdAt": 1788617296877,
+      "updatedAt": 1788632505022,
+      "summary": "README gains COLOPHON_COOKIE_SECURE and COLOPHON_BACKUP_DIR rows in the Environment table plus a 'Putting it on the public internet' section: TLS + cookie_secure, FORWARDED_ALLOW_IPS for the proxy, never deploy with the dev bypass, change seeded admin/demo passwords, invite-only account management, backup data/ — with a pointer to the tests/hardening/ contracts."
+    },
+    {
+      "id": "card-2cf6cadb-0516-4bbd-a2d4-07060d0ac3e3",
+      "title": "Verify and fix session-expiry enforcement end to end",
+      "description": "User suspects login tokens never expire. The sliding/absolute maths exist and are unit-tested, but no test proves the HTTP layer actually enforces expiry (deps.current_user → load_session → touch_session), and the cookie max_age is a separate constant that could drift from the server-side cap. Verify with a live-client test; fix if anything is off; pin with tests.",
+      "rationale": "Session lifetime is the core of the invite-only threat model on a public domain: a token that outlives its user turns one stolen cookie into a permanent account. The user's suspicion targets exactly the layer (cookie vs server) where such bugs hide.",
+      "sourceSessionId": "session-6ee782a7-cb13-418c-b499-95c76a611c37",
+      "status": "done",
+      "tags": [
+        "hardening",
+        "auth",
+        "sessions"
+      ],
+      "createdAt": 1793545162932,
+      "updatedAt": 1793545162932,
+      "summary": "User suspected login tokens never expire. VERDICT: the suspicion was reasonable but expiry IS enforced - no bug. The design is sliding + absolute: every login writes expires_at = created_at + 90 days as a hard cap; deps.current_user calls load_session on every request, which revokes and rejects any session whose expires_at is past; touch_session slides to last-use + 30 days but clamps under the cap (proven by an existing 91-day daily-touch test). The cookie max-age (90d) equals the server cap by construction. The real gap was test coverage: nothing proved the running app enforces expiry end to end, and the cookie/server constants could have drifted silently. Added tests/hardening/test_hardening_session_expiry.py (2 tests): live-client sign-out when expires_at passes (303 to /login), and SESSION_MAX_AGE == ABSOLUTE_LIFETIME as a drift tripwire. Auth suites green (62 passed), ruff clean.",
+      "rejected": "Shortening lifetimes or adding idle-timeout config knobs - 30/90 days is the documented SPEC 13 contract and reasonable for a personal library; the drift tripwire plus README checklist cover the operational side. Also rejected: deleting expired rows via a sweeper - load_session already deletes on first touch of an expired row, so rows cannot accumulate beyond one per abandoned session."
+    }
+  ]
+}

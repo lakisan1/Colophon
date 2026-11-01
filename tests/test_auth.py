@@ -1,4 +1,4 @@
-# Auth tests (M5). The PLAN asks specifically for negative cases: the lockout
+# Auth tests. The spec asks specifically for negative cases: the lockout
 # must actually lock, a mutation without a CSRF token must be refused, the session
 # cookie must carry its flags, and the expiry maths must be provable rather than
 # assumed. Time is injected everywhere so no test sleeps.
@@ -267,7 +267,7 @@ def test_session_cookie_flags(auth_client: TestClient) -> None:
     assert "httponly" in header
     assert "samesite=lax" in header
     assert "path=/" in header
-    # Off by default so plain-HTTP LAN installs can sign in; see docs/GITHUB.md.
+    # Off by default so plain-HTTP LAN installs can sign in.
     assert "secure" not in header.replace("httponly", "")
 
 
@@ -920,10 +920,17 @@ def test_the_settings_form_asks_before_switching_every_provider_off(
 
     page = auth_client.get("/settings")
 
-    assert "Are you sure you want to disable all search providers?" in page.text
-    assert "The New book lookup won't work." in page.text
-    assert 'input[name^="provider_"]:checked' in page.text
-    assert "preventDefault" in page.text
+    # The confirm lives in /static/js/settings.js — moved out of the page so the
+    # CSP can hold at script-src 'self' — so the page must load the file and the
+    # file must still carry the whole ask.
+    assert '<script src="/static/js/settings.js" defer></script>' in page.text
+    settings_js = (
+        Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "settings.js"
+    ).read_text(encoding="utf-8")
+    assert "Are you sure you want to disable all search providers?" in settings_js
+    assert "The New book lookup won't work." in settings_js
+    assert 'input[name^="provider_"]:checked' in settings_js
+    assert "preventDefault" in settings_js
 
 
 def test_the_shelf_follows_the_stored_zoom(auth_client: TestClient) -> None:

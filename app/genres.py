@@ -15,8 +15,8 @@ class Genre:
     """One shelf genre.
 
     notation: BISAC code and the join key (books.primary_genre_notation).
-    label:    full BISAC label, used to match provider subjects in M4.
-    section:  short shelf-section heading for M3; GENRES list order is the
+    label:    full BISAC label, used to match provider subjects.
+    section:  short shelf-section heading; GENRES list order is the
               section order on the shelf.
     """
 

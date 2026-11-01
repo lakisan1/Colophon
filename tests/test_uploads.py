@@ -1,4 +1,4 @@
-# Photo ingest tests (M4). The fixture images are generated with Pillow in
+# Photo ingest tests. The fixture images are generated with Pillow in
 # tmp_path — including a JPEG that really carries EXIF and GPS — because "EXIF
 # was stripped" has to be proven against a file that had it, not asserted.
 from __future__ import annotations

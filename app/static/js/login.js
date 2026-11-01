@@ -1,6 +1,19 @@
-/* Login page: autofocus the username, toggle password visibility,
-   and let the error banner be dismissed. */
+/* Login page scripts. Loaded from <head>, before the stylesheets, so the first
+   paint already carries the saved theme (the old inline <head> script moved here
+   so the CSP can hold at script-src 'self' with no unsafe-inline). */
 (() => {
+  try {
+    const t = localStorage.getItem("colophon-theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (err) {}
+})();
+
+/* The rest needs the document. When this file runs from <head> the DOM is not
+   built yet, so wait for DOMContentLoaded; a deferred/bottom load runs directly. */
+const onReady = (fn) =>
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", fn) : fn();
+
+onReady(() => {
   const username = document.getElementById("login-user");
   const password = document.getElementById("login-pass");
   const toggle = document.querySelector("[data-login-toggle]");
@@ -23,8 +36,8 @@
   }
 
   /* Dark/light toggle. The page defaults to dark (the server renders
-     data-theme="dark" and the inline <head> script applies any saved choice);
-     clicking flips it and remembers it for next time. */
+     data-theme="dark" and the pre-paint block at the top of this file applies
+     any saved choice); clicking flips it and remembers it for next time. */
   const themeBtn = document.querySelector("[data-login-theme]");
   function loginTheme() {
     return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
@@ -45,4 +58,4 @@
     });
     renderThemeToggle(loginTheme());
   }
-})();
+});

@@ -1,5 +1,5 @@
-# current_user in M0: without the dev bypass every signed-in route redirects the
-# browser to /login; with it, a placeholder user gets through. Real sessions are M5.
+# Without the dev bypass, current_user redirects every signed-in request to
+# /login; with it, a placeholder user gets through.
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

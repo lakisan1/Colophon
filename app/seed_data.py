@@ -1,4 +1,4 @@
-# Dev/demo fixture (M2). Real titles, real page counts and real millimetre
+# Dev/demo fixture. Real titles, real page counts and real millimetre
 # dimensions so the shelf maths and the size-variation views have something
 # honest to work with.
 #
@@ -11,14 +11,14 @@
 #   * one duplicate title in two formats (hardcover owned + paperback wanted),
 #     which is what ownership-level dedup has to reason about (D3);
 #   * multi-author rows, including a four-author one (Design Patterns);
-#   * `isbn` is left NULL everywhere. Inventing ISBN-13s would hand M4's Open
+#   * `isbn` is left NULL everywhere. Inventing ISBN-13s would hand the Open
 #     Library lookups codes that resolve to the wrong book, which is worse than
-#     no code. M4 ships its own ISBN fixture.
+#     no code. The lookup tests ship their own ISBN fixture.
 from __future__ import annotations
 
 DEMO_USERNAME = "demo"
-# Dev fixture only. M5 owns real accounts and enforces its own password policy;
-# this one is a single-user app on a laptop, per DECISIONS.
+# Dev fixture only. Real accounts enforce their own password policy; this
+# one is a single-user app on a laptop, per DECISIONS.
 DEMO_PASSWORD = "demo"
 
 ROOMS: tuple[str, ...] = (
@@ -3051,7 +3051,8 @@ LOANS: tuple[tuple, ...] = (
 )
 
 # Open Library-style cached provider rows. Only `provider_filename` is set: the
-# actual image bytes arrive with M7, and M7 treats these as the cache key.
+# actual image bytes are never part of the fixture, and the filename is the
+# cache key.
 PHOTO_PROVIDERS: dict[str, tuple[str, ...]] = {
     "Dune": ("front", "spine"),
     "Neuromancer": ("front",),

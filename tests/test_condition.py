@@ -1,4 +1,4 @@
-# Condition rating (M8): a 1-5 mark on the physical copy.
+# Condition rating: a 1-5 mark on the physical copy.
 #
 # Condition is the one attribute a collector compares across the library, and
 # free text ("goodish", "VG-") sorts and filters badly, so it is a bounded

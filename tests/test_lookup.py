@@ -1,4 +1,4 @@
-# Lookup tests with a stubbed transport (M4's verification requirement). Nothing
+# Lookup tests with a stubbed transport. Nothing
 # here touches the network: the provider is replaced with httpx.MockTransport, so
 # a slow or failing Open Library cannot make the suite flaky — and the failure
 # path is a first-class case, not an afterthought.
@@ -617,6 +617,14 @@ def test_provider_cover_download_failure_is_none(monkeypatch: pytest.MonkeyPatch
 def test_provider_cover_rejects_non_http_urls() -> None:
     assert fetch_provider_cover("file:///etc/passwd") is None
     assert fetch_provider_cover("") is None
+
+
+def test_provider_cover_rejects_non_provider_hosts() -> None:
+    """cover_url is form input: anything but the providers' own cover hosts is
+    refused, so the server cannot be made to GET internal addresses (SSRF)."""
+    assert fetch_provider_cover("http://169.254.169.254/latest/meta-data/") is None
+    assert fetch_provider_cover("http://127.0.0.1:8321/healthz") is None
+    assert fetch_provider_cover("http://evil.example.com/cover.jpg") is None
 
 
 def test_isbn_lookup_calls_the_open_library_isbn_api(monkeypatch: pytest.MonkeyPatch) -> None:

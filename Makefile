@@ -4,14 +4,14 @@
 VENV := .venv
 PIP := $(VENV)/bin/pip
 
-.PHONY: venv dev test lint fmt migrate seed beat doctor
+.PHONY: venv dev test lint fmt migrate seed doctor
 
 venv:
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements.txt -r requirements-dev.txt
 
-# Dev server: reload on change, dev auth bypass on (login is M5).
+# Dev server: reload on change, dev auth bypass on.
 dev:
 	COLOPHON_DEV_AUTH_BYPASS=1 $(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -19,8 +19,10 @@ dev:
 # The demo user is 'demo' / 'demo' until the password is changed in /settings.
 # migrate first: a database behind head 500s on the login page with
 # 'no such table', which is a confusing way to discover a missing migration.
+# --proxy-headers: behind a reverse proxy, set FORWARDED_ALLOW_IPS to the
+# proxy's address so the per-IP login lockout keys on real client IPs.
 serve: migrate
-	$(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+	$(VENV)/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 
 test:
 	$(VENV)/bin/pytest -q
@@ -34,15 +36,10 @@ fmt:
 migrate:
 	$(VENV)/bin/alembic upgrade head
 
-# Dev/demo fixture (M2). Rebuilds only the demo user's rows, so it is safe to
+# Dev/demo fixture. Rebuilds only the demo user's rows, so it is safe to
 # re-run against a database that already holds other data.
 seed:
 	$(VENV)/bin/python -m app.seed
-
-# Liveness heartbeat. Any agent doing work touches this; scripts/doctor.sh calls
-# the run dead when it goes stale. Cheap insurance against a silent stall.
-beat:
-	@mkdir -p .run && date -u +%Y-%m-%dT%H:%M:%SZ > .run/heartbeat
 
 # Status in one line. `make doctor CHECK=1` also runs the test suite.
 doctor:

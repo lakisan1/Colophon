@@ -1,4 +1,4 @@
-"""M5 auth: sessions and login throttling.
+"""Auth sessions and login throttling.
 
 Two tables, both throwaway by design — losing them costs nobody any data.
 

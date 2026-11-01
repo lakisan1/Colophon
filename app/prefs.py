@@ -1,6 +1,6 @@
 # Reading the owner's effective preferences: their own settings row, falling back
-# to the global row, falling back to defaults. M5 owns the settings *page* and
-# every write; the shelf only reads, because it cannot render without a zoom
+# to the global row, falling back to defaults. The settings *page* owns every
+# write; the shelf only reads, because it cannot render without a zoom
 # preset (A2) and a theme.
 from __future__ import annotations
 
@@ -129,7 +129,7 @@ def persist_zoom(session: Session, owner_id: int, zoom: str) -> None:
     """Remember the shelf zoom on the user's own settings row (A2).
 
     Written as update-then-insert because a user without a row is the normal
-    case until the settings page (M5) creates one. Other columns keep whatever
+    case until the settings page creates one. Other columns keep whatever
     the global row says, which `load_prefs` resolves at read time.
     """
     updated = session.execute(

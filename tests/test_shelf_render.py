@@ -1,6 +1,6 @@
-# Rendered-HTML tests for the shelf page (M3's verification requirement). These
-# assert structure and geometry as the browser receives it; how it *looks* is
-# docs/VISUAL-QA.md, which only a human can sign off.
+# Rendered-HTML tests for the shelf page. These
+# assert structure and geometry as the browser receives it; how it *looks* only
+# a human can judge.
 from __future__ import annotations
 
 import re
@@ -150,7 +150,7 @@ def test_thin_spines_still_carry_a_tooltip(seeded_client: TestClient) -> None:
 
 
 def test_no_broken_images_are_rendered(seeded_client: TestClient) -> None:
-    """Covers arrive in M4/M7. Until then nothing may reference a missing file."""
+    """No page may reference an image file that does not exist."""
     html = seeded_client.get("/").text
 
     assert "<img" not in html

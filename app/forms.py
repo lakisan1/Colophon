@@ -7,6 +7,7 @@
 # session and no cookie in play, so the check is skipped — see app/deps.py.
 from __future__ import annotations
 
+from secrets import compare_digest
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -31,10 +32,7 @@ def verify_csrf(user: CurrentUser, submitted: str | None, cookie: str | None) ->
         return  # dev bypass: nothing to protect yet
     if not submitted or not cookie:
         raise CsrfFailed("Missing CSRF token.")
-    if submitted != cookie or submitted != user.csrf_token:
+    # Constant-time on purpose: a token check is exactly the kind of comparison
+    # that must not leak how much of a guessed prefix was right.
+    if not compare_digest(submitted, cookie) or not compare_digest(submitted, user.csrf_token):
         raise CsrfFailed("CSRF token does not match this session.")
-
-
-def csrf_input(user: CurrentUser) -> dict:
-    """Template helper: the hidden field every form must carry."""
-    return {"name": "csrf_token", "value": user.csrf_token or ""}

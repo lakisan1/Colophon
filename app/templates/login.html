@@ -4,16 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page_title | default('Colophon — Sign in', true) }}</title>
-  {# The login page defaults to dark; apply a saved choice before first paint so
-     the page never flashes from dark to light. #}
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem("colophon-theme");
-        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-    })();
-  </script>
+  {# The login page defaults to dark; a saved choice must be applied before first
+     paint so the page never flashes dark-to-light. That script used to be inline
+     here; it now lives at the top of login.js (CSP: script-src 'self'), loaded
+     before the stylesheets so the attribute is set before CSS applies. #}
+  <script src="/static/js/login.js"></script>
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="/static/css/login.css">
 </head>
@@ -51,12 +46,13 @@
         <button class="login-submit" type="submit">Sign in</button>
       </form>
 
+      {% if demo_hint %}
       <p class="login-hint">
         Demo account &mdash; user <code>demo</code>, password <code>demo</code>.
       </p>
+      {% endif %}
     </section>
   </main>
 
-  <script src="/static/js/login.js"></script>
 </body>
 </html>

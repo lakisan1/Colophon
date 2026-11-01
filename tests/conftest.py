@@ -30,7 +30,7 @@ def bypass_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 @pytest.fixture()
 def seeded_db(monkeypatch: pytest.MonkeyPatch, tmp_path) -> tuple[TestClient, Engine]:
-    """The M2 fixture database, exposed as (client, engine).
+    """The seed fixture database, exposed as (client, engine).
 
     Tests must not read the project's dev database: it changes with every
     `make seed` on the laptop, and a shelf test that quietly depends on it turns

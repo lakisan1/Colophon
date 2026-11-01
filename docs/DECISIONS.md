@@ -1,7 +1,7 @@
 # Locked decisions
 
 Authoritative delta over `README.md`. Where this file and `README.md` disagree, **this file wins**.
-Every entry was decided by Lazar (2027-08-27) or is a documented assumption by the assistant marked `[ASSUMPTION]`.
+Every entry was decided by Lazar (2027-08-27).
 
 ## Product
 
@@ -10,7 +10,7 @@ Every entry was decided by Lazar (2027-08-27) or is a documented assumption by t
 | D1 | Scope | Physical books only. No e-books, no audiobooks. |
 | D2 | Identity model | **One row = one physical book.** No Work / Edition / Copy hierarchy. Two identical books with different annotations are two independent rows. Optional `same_edition_as_id` self-link exists so "how many of this do I have" is possible later. |
 | D3 | Duplicate handling | Warning only, never blocks, on ISBN match then title+author match. Suggested action: "add as another copy of the same edition" sets `same_edition_as_id`. |
-| D4 | Genres | Hardcoded curated list, keyed by BISAC notation. No user-defined genres in the UI. Extending the list = a code change in `app/regenres.py`. See curated list below. |
+| D4 | Genres | Hardcoded curated list, keyed by BISAC notation. No user-defined genres in the UI. Extending the list = a code change in `app/genres.py`. See curated list below. |
 | D5 | Shelf placement | A book has exactly **one** primary genre → one shelf section. Extra genres for filtering only. |
 | D6 | Sort order | Section by genre → within section: series number (nulls last) → author last name → title. |
 | D7 | Rooms | `rooms` table, nullable `room_id` on a book (answer to "office / living-room cabinet"). Filter, not a grouping level. |
@@ -22,7 +22,7 @@ Every entry was decided by Lazar (2027-08-27) or is a documented assumption by t
 | D13 | Import | No import in v1. Library is entered by hand. Export = CSV + JSON. |
 | D14 | Language | Everything in English: UI, code, comments, docs, commit messages. |
 
-## Shelf rendering (the risky part — all `[ASSUMPTION]`, veto in the morning)
+## Shelf rendering
 
 | # | Topic | Decision |
 |---|---|---|
@@ -57,5 +57,4 @@ Every entry was decided by Lazar (2027-08-27) or is a documented assumption by t
 Write for a lazy reader. Boring code, obvious names, no `temp`/`utils2`/`new_final`. Every module opens with 2–3 lines saying *why* it exists.
 No premature abstraction — three similar lines beat a helper nobody else can follow. No framework magic, no metaprogramming, no generic base classes.
 Prefer plain SQL the reader can reason about over ORM tricks that hide the query. Fix technical debt the moment it is noticed rather than leaving a TODO.
-AGPL-3.0 licensed. Local git only, one commit per milestone, **never push** (no remote configured; see `docs/GITHUB.md`).
-| T13 | Agent concurrency | At most **one DeepSeek and one Qwen at the same time**; never two of the same model. Parallel workers must own **disjoint file sets** (see `docs/AUTOMATION.md`); `app/main.py` and `app/deps.py` stay with the orchestrator. Supersedes the earlier "serial model calls only" line. Providers are the self-hosted LAN servers only — `local` deepseek-v4-flash, `local2` qwen3.8-flash-next; hosted DeepSeek is never used and a failed call is reported, never re-routed. Preflight both `/v1/models` endpoints before diagnosing a dead agent (`docs/AUTOMATION.md`). Decided by Lazar 2026-08-28. |
+AGPL-3.0 licensed. Development happens on GitHub.

@@ -1,5 +1,5 @@
 /*
- * Design tokens only — no component CSS lives here (milestone M3 styles the shelf).
+ * Design tokens only — no component CSS lives here.
  * Light theme is the default on :root; the data-theme attribute on <html>
  * (see base.html) switches to the dark palette. Names refer to the physical
  * thing they paint: wooden shelf, cloth spine, ink on paper.
@@ -28,7 +28,7 @@
   --paper: #f6f1e7;
   --paper-raised: #fffdf8;
 
-  /* Inputs, raised panels, hairline rules and dim text (M6 filter/table/stats). */
+  /* Inputs, raised panels, hairline rules and dim text. */
   --surface: #fff;
   --surface-raised: rgba(255, 255, 255, 0.55);
   --rule: rgba(0, 0, 0, 0.12);
@@ -38,7 +38,7 @@
   --focus-ring: #b3541e;
   --focus-ring-offset: #f6f1e7;
 
-  /* Motion: shelf flip and hover transitions (M3 consumes these). */
+  /* Motion: shelf flip and hover transitions. */
   --motion-duration: 220ms;
   --motion-ease: ease-out;
 }

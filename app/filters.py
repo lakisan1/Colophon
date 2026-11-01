@@ -1,4 +1,4 @@
-# Filters (M6, SPEC §9). Everything here is pure: parse a query string into a
+# Filters (SPEC §9). Everything here is pure: parse a query string into a
 # Filters object, turn that object into WHERE fragments. No database, no request.
 #
 # Two rules shape the parsing:

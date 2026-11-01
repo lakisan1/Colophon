@@ -1,4 +1,4 @@
-# Add, edit and photos (M4). Server-rendered forms, no JavaScript required: the
+# Add, edit and photos. Server-rendered forms, no JavaScript required: the
 # page posts values and the server answers with HTML, which keeps the whole path
 # testable and keeps the app usable when a script fails to load.
 #
@@ -19,11 +19,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.auth import CSRF_COOKIE
 from app.db import get_session
 from app.deps import CurrentUser, current_user
 from app.duplicates import find_duplicates
 from app.formats import FORMAT_BY_KEY
-from app.forms import read_form
+from app.forms import read_form, verify_csrf
+from app.genres import GENRES
 from app.isbn import normalize_isbn
 from app.lookup import fetch_provider_cover
 from app.money import format_price
@@ -31,7 +33,14 @@ from app.page import page_context, page_prefs
 from app.settings import settings
 from app.shelf import CLOTH_HUES, cloth_hue
 from app.templating import templates
-from app.uploads import SLOTS, UploadError, delete_upload, read_upload, save_upload
+from app.uploads import (
+    MAX_UPLOAD_BYTES,
+    SLOTS,
+    UploadError,
+    delete_upload,
+    read_upload,
+    save_upload,
+)
 
 router = APIRouter()
 
@@ -83,7 +92,12 @@ _PREFILL_FIELDS = (
 
 
 @router.get("/book/lookup")
-async def book_lookup(isbn: str = ""):
+def book_lookup(
+    # user is the gate: this endpoint relays provider queries, so it must not be
+    # reachable signed out like every other route under /book.
+    user: Annotated[CurrentUser, Depends(current_user)],
+    isbn: Annotated[str, Query(max_length=32)] = "",
+):
     """Look up an ISBN on Open Library (free API) and return its metadata as JSON.
 
     Used by the add/edit form: typing an ISBN prefills title, authors, publisher,
@@ -106,13 +120,19 @@ async def book_lookup(isbn: str = ""):
 
 
 @router.post("/book/new", response_class=HTMLResponse)
-async def create_book(
+def create_book(
     request: Request,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
     form: Annotated[dict, Depends(read_form)],
 ) -> HTMLResponse:
+    # Plain def, not async: the provider lookups and bcrypt are blocking calls
+    # on the single worker (T2), so FastAPI should run this in its threadpool
+    # instead of stalling the event loop for everyone.
     outcome = _parse_form(form)
+    outcome.values["room_id"] = _room_id_for_owner(
+        session, user.id, outcome.values.get("room_id")
+    )
     if outcome.errors:
         return _render_form(
             request, session, user, outcome=outcome, book=None, lookup_query=None, status_code=400
@@ -162,18 +182,22 @@ def edit_book_form(
 
 
 @router.post("/book/{book_id}/edit", response_class=HTMLResponse)
-async def update_book(
+def update_book(
     request: Request,
     book_id: int,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
     form: Annotated[dict, Depends(read_form)],
 ) -> HTMLResponse:
+    # Plain def, like create_book: blocking work belongs in the threadpool.
     book = _load_book(session, user.id, book_id)
     if book is None:
         return _not_found(request)
 
     outcome = _parse_form(form)
+    outcome.values["room_id"] = _room_id_for_owner(
+        session, user.id, outcome.values.get("room_id")
+    )
     if outcome.errors:
         return _render_form(
             request, session, user, outcome=outcome, book=book, lookup_query=None, status_code=400
@@ -288,22 +312,29 @@ def book_page(
 
 @router.post("/book/{book_id}/photos")
 async def add_photo(
+    request: Request,
     book_id: int,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
     slot: Annotated[str, Form(max_length=16)],
     file: Annotated[UploadFile, File()],
+    csrf_token: Annotated[str | None, Form()] = None,
     crop_left: Annotated[int | None, Form()] = None,
     crop_top: Annotated[int | None, Form()] = None,
     crop_right: Annotated[int | None, Form()] = None,
     crop_bottom: Annotated[int | None, Form()] = None,
 ) -> RedirectResponse:
     """Upload a cover, back or spine photo and replace whatever was in that slot."""
+    # This route reads the multipart form directly instead of through read_form
+    # (it needs the file), so it verifies the token itself, like every mutation.
+    verify_csrf(user, csrf_token, request.cookies.get(CSRF_COOKIE))
     book = _load_book(session, user.id, book_id)
     if book is None:
         return RedirectResponse(url="/", status_code=303)
 
-    data = await file.read()
+    # Read one byte past the limit: a huge upload is capped in RAM here instead
+    # of being read whole and rejected afterwards by save_upload's size check.
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
     crop = None
     if None not in (crop_left, crop_top, crop_right, crop_bottom):
         crop = (crop_left, crop_top, crop_right, crop_bottom)
@@ -338,11 +369,16 @@ async def add_photo(
 
 @router.post("/book/{book_id}/photos/{slot}/delete")
 def remove_photo(
+    request: Request,
     book_id: int,
     slot: str,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[Session, Depends(get_session)],
+    csrf_token: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
+    # Mutation without read_form (no body parser needed here), so the token is
+    # verified here, like every mutation.
+    verify_csrf(user, csrf_token, request.cookies.get(CSRF_COOKIE))
     if slot not in SLOTS:
         return RedirectResponse(url=f"/book/{book_id}/edit", status_code=303)
     book = _load_book(session, user.id, book_id)
@@ -455,14 +491,20 @@ def get_photo(
     if stored is None:
         return Response(content=b"", status_code=404)
     filename, data = stored
-    return Response(content=data, media_type=_media_type(filename))
+    # private: these bytes belong to one reader; a shared cache (the reverse
+    # proxy of T9/T11) must never hand them to a different one.
+    return Response(
+        content=data,
+        media_type=_media_type(filename),
+        headers={"cache-control": "private"},
+    )
 
 
 def _photo_bytes(session: Session, book_id: int, slot: str) -> tuple[str, bytes] | None:
     """The image bytes for one slot, or None.
 
     An upload wins over a cached provider image (T6). A `photos` row can exist with
-    no file behind it — the M2 fixture records provider filenames, and a provider
+    no file behind it — the seed fixture records provider filenames, and a provider
     download can fail after the row was written — so "is there a row" is not the
     question any page should ask. Pages ask this one, which is why they never render
     a broken image.
@@ -686,8 +728,28 @@ def _parse_form(form: dict) -> FormOutcome:
     if values.get("ownership_status") in ABSENT_STATUSES:
         values["room_id"] = None
 
-    values["primary_genre_notation"] = (form.get("primary_genre_notation") or "").strip() or None
+    raw_genre = (form.get("primary_genre_notation") or "").strip()
+    values["primary_genre_notation"] = raw_genre or None
+    # The form only offers curated notations (D4); anything else would violate
+    # the foreign key at commit time and 500 instead of naming the mistake.
+    if raw_genre and raw_genre not in {g.notation for g in GENRES}:
+        outcome.errors.append("That genre is not one of the curated entries.")
     return outcome
+
+
+def _room_id_for_owner(session: Session, owner_id: int, room_id: int | None) -> int | None:
+    """A room id the form names must be one of this owner's rooms, else None.
+
+    The form only offers the owner's rooms, but a crafted POST could name
+    another owner's room and leak its name through the book page.
+    """
+    if room_id is None:
+        return None
+    owned = session.execute(
+        text("SELECT 1 FROM rooms WHERE id = :id AND owner_id = :owner_id"),
+        {"id": room_id, "owner_id": owner_id},
+    ).first()
+    return room_id if owned else None
 
 
 def _last_insert_id(session: Session) -> int:

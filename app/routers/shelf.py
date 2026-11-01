@@ -1,4 +1,4 @@
-# The four shelves, search and the dashboard (M6).
+# The four shelves, search and the dashboard.
 #
 # One route per shelf sharing a single context builder, because the difference
 # between them is a scope and a template — not a second implementation of zoom

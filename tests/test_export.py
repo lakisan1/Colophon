@@ -1,4 +1,4 @@
-# CSV and JSON export (SPEC §11; PLAN M6 verify: "export round-trips through a parser").
+# CSV and JSON export (SPEC §11): the export must round-trip through a parser.
 #
 # The export is the only door data leaves Colophon — there is no import (D13), so
 # the file a user downloads today is the backup they rebuild from in five years.

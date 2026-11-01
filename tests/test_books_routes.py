@@ -1,4 +1,4 @@
-# Add / edit / photo endpoints (M4). Uploads go through a real multipart POST
+# Add / edit / photo endpoints. Uploads go through a real multipart POST
 # with a Pillow-generated image, and the provider is stubbed, so these exercise
 # the whole path without a network or a browser.
 from __future__ import annotations
@@ -323,7 +323,7 @@ def test_a_bad_dimension_is_rejected(seeded_client: TestClient) -> None:
 
 def test_a_duplicate_saves_anyway_and_says_so(seeded_client: TestClient) -> None:
     """D3 is warn-only: the copy is real, the warning is a message."""
-    unique = "The Ledger of Nine Coppers"  # not in the M2 fixture
+    unique = "The Ledger of Nine Coppers"  # not in the seed fixture
     first = seeded_client.post("/book/new", data={"title": unique}, follow_redirects=False)
     assert "duplicate" not in first.headers["location"]
 

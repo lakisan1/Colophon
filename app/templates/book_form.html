@@ -1,4 +1,4 @@
-{# Add / edit one book (M4). Plain HTML form posts; every field here maps to a
+{# Add / edit one book. Plain HTML form posts; every field here maps to a
    column in `books`, and validation messages come back from the server rather
    than from JavaScript. #}
 {% extends "base.html" %}
@@ -73,7 +73,7 @@
     {# ---------------- the book ---------------- #}
     <form class="card" method="post" data-max-plausible-mm="{{ max_plausible_mm }}"
           action="{% if book %}/book/{{ book.id }}/edit{% else %}/book/new{% endif %}">
-      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">{% if not user %}{% endif %}
+      <input type="hidden" name="csrf_token" value="{{ user.csrf_token }}">
       {% if confirm_oversize %}
         {# An oversize warning is showing: this turns the next press of the same
            Save button into the confirmation, with or without JavaScript. #}

@@ -1,5 +1,5 @@
 /*
- * The shelf (M3). Geometry arrives as CSS custom properties computed by
+ * The shelf. Geometry arrives as CSS custom properties computed by
  * app/shelf.py — this file never re-derives millimetres, it only paints.
  * Colours come from theme.css tokens; nothing here hardcodes a hex value, so
  * light/dark switching stays a token swap.
@@ -475,7 +475,7 @@
   .shelf-row { padding: 0 0.9rem; }
 }
 
-/* ---------------------------------------------------------------- M6 shelves */
+/* ------------------------------------------------------------------- shelves */
 /* Navigation between the four shelves, search and statistics. Text links, not    */
 /* tabs with JS: the query string rides along so a filter survives a shelf change.*/
 .shelf-nav {
@@ -507,7 +507,7 @@
   border-bottom: 2px solid var(--accent, #7a5e3a);
 }
 
-/* ---------------------------------------------------------------- M6 filters */
+/* ------------------------------------------------------------------- filters */
 /* The filter bar is a plain GET form laid out with flexbox, so it works with the  */
 /* stylesheet only and degrades to a stacked list of fields on narrow screens.     */
 /* The search/filter fields live inside the toolbar card above, so this bar is a
@@ -577,7 +577,7 @@
   color: var(--ink-dim, #5a5045);
 }
 
-/* ------------------------------------------------------------------ M6 tables */
+/* -------------------------------------------------------------------- tables */
 /* Shelves 2 and 3 are read as lists — borrower, date, price — which a row of      */
 /* spines cannot say. Same paper palette, so it still feels like one application.  */
 .data-table {
@@ -639,7 +639,7 @@
   border-bottom: 2px solid var(--accent, #7a5e3a);
 }
 
-/* ------------------------------------------------------------------ M6 stats */
+/* --------------------------------------------------------------------- stats */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

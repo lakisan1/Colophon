@@ -1,4 +1,4 @@
-# Statistics: total value of the collection (M8).
+# Statistics: total value of the collection.
 #
 # The total is the sum of price over books the owner currently holds
 # (owned/wanted/borrowed). Sold and gifted books are no longer part of the

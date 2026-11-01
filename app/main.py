@@ -10,11 +10,14 @@ from fastapi.staticfiles import StaticFiles
 from app.deps import CsrfFailed, LoginRequired
 from app.routers import auth, books, export, healthz, shelf
 from app.routers import settings as settings_router
+from app.settings import settings
 from app.templating import STATIC_DIR
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Colophon", docs_url=None, redoc_url=None)
+    # The route map is an implementation detail: docs/redoc/openapi stay off so
+    # an anonymous probe cannot enumerate the API surface.
+    app = FastAPI(title="Colophon", docs_url=None, redoc_url=None, openapi_url=None)
 
     app.include_router(healthz.router)
     app.include_router(auth.router)
@@ -24,14 +27,45 @@ def create_app() -> FastAPI:
     app.include_router(export.router)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    # Static assets revalidate on every load so a CSS/JS change shows up on a
-    # plain refresh (no hard-refresh). Without this the browser heuristically
-    # caches stylesheets and keeps showing a stale "old" UI after an edit.
+    # Headers every response carries, applied in one place so no route can
+    # forget them. Static assets revalidate on every load so a CSS/JS change
+    # shows up on a plain refresh (no hard-refresh) — without it the browser
+    # heuristically caches stylesheets and keeps showing a stale UI after an
+    # edit. nosniff (T7) stops a served image or download from being
+    # reinterpreted as a different content type.
+    #
+    # The rest is the public-deployment set (see tests/hardening). Dynamic
+    # responses default to private/no-store — pages are rendered per reader
+    # (theme, prefs, their books), so a shared proxy caching them would leak
+    # one reader's shelf to another; the photo route sets its own directive,
+    # which setdefault leaves alone. The CSP allows no inline script: the two
+    # former inline blocks live in static/js now, so script-src 'self' holds.
+    # style-src keeps unsafe-inline only for the spine-rendering style
+    # attributes (server-computed integers, no user text). HSTS is sent only
+    # when cookies are marked Secure — on a plain-HTTP install it would do
+    # nothing, and advertising it anyway pins the domain to HTTPS silently.
+    CONTENT_SECURITY_POLICY = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; object-src 'none'; base-uri 'none'; "
+        "frame-ancestors 'none'; form-action 'self'"
+    )
+
     @app.middleware("http")
-    async def no_cache_static(request: Request, call_next):
+    async def security_headers(request: Request, call_next):
         response = await call_next(request)
         if request.url.path.startswith("/static/"):
             response.headers["cache-control"] = "no-cache"
+        else:
+            response.headers.setdefault("cache-control", "private, no-store")
+        response.headers["x-content-type-options"] = "nosniff"
+        # The app frames nothing, not even its own pages, so a foreign page
+        # cannot clickjack a signed-in reader's forms.
+        response.headers["x-frame-options"] = "DENY"
+        response.headers["content-security-policy"] = CONTENT_SECURITY_POLICY
+        response.headers["referrer-policy"] = "strict-origin-when-cross-origin"
+        response.headers["permissions-policy"] = "camera=(), microphone=(), geolocation=()"
+        if settings.cookie_secure:
+            response.headers["strict-transport-security"] = "max-age=31536000"
         return response
 
     @app.exception_handler(LoginRequired)

@@ -6,8 +6,6 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Signs session cookies. MUST be replaced for anything beyond localhost.
-      COLOPHON_SECRET_KEY: "change-me-local-dev-only"
       # SQLite file and photo directory inside the named volume (absolute paths).
       COLOPHON_DB_PATH: /data/colophon.sqlite3
       COLOPHON_UPLOAD_DIR: /data/uploads
@@ -15,7 +13,8 @@ services:
       # COLOPHON_DEV_AUTH_BYPASS: "1"
       # No provider keys here: Google Books and ISBNdb are keyed per reader on
       # /settings (Settings -> Search providers), and Open Library needs no key.
-      # Behind a reverse proxy, set the proxy's network so rate limiting keys on
+      # uvicorn runs with --proxy-headers; behind a reverse proxy, set
+      # FORWARDED_ALLOW_IPS to the proxy's address so rate limiting keys on
       # real client IPs instead of the proxy (T9). Read by uvicorn directly.
       # FORWARDED_ALLOW_IPS: ""
     volumes:

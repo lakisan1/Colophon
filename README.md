@@ -74,7 +74,7 @@ Know your library and take it with you.
 Requires Python 3.12+ and SQLite.
 
 ```sh
-make venv && make dev
+make venv && make migrate && make dev
 ```
 
 Then open <http://localhost:8000>. `make dev` runs a single-worker uvicorn with reload and sets
@@ -110,14 +110,40 @@ All variables are optional in development:
 
 | Variable | Purpose |
 |---|---|
-| `COLOPHON_SECRET_KEY` | Cookie signing key; falls back to an obviously-insecure dev value |
 | `COLOPHON_DB_PATH` | SQLite file path (default `data/colophon.sqlite3`) |
 | `COLOPHON_UPLOAD_DIR` | Uploaded photos directory (default `data/photos/`) |
-| `COLOPHON_DEV_AUTH_BYPASS` | `1` skips login — development only |
+| `COLOPHON_COOKIE_SECURE` | `1` marks session cookies Secure (HTTPS-only) — set this on any TLS deployment |
+| `COLOPHON_BACKUP_DIR` | Backup output directory (default `data/backups/`) |
+| `COLOPHON_DEV_AUTH_BYPASS` | `1` skips login — development only, never on a public host |
 
 Search keys are **per reader, not per install**: Open Library needs no key, while Google Books and
 ISBNdb are keyed with each reader's own key, pasted in **Settings → Search providers**. There is no
 server-side key env var, and enabling a keyed provider without its key is refused on that page.
+
+## 🌍 Putting it on the public internet
+
+The app is built for this and nothing else needs to change in code: login is required everywhere, there
+is **no public signup** — accounts exist only because the admin created them in **Settings → Create a
+user** — and sessions, CSRF, login throttling and the security headers are on by default. What is yours
+to do:
+
+1. **TLS.** Put a reverse proxy (nginx, Caddy) in front and set `COLOPHON_COOKIE_SECURE=1` so session
+   cookies only ever travel over HTTPS. uvicorn already runs with `--proxy-headers`; set
+   `FORWARDED_ALLOW_IPS` to your proxy's address so the per-IP login lockout keys on real client IPs
+   rather than the proxy's (otherwise one attacker can lock *every* reader out with five bad logins).
+2. **Never deploy with the dev bypass.** `COLOPHON_DEV_AUTH_BYPASS=1` (which `make dev` sets) disables
+   login entirely. `make serve` and the Docker image never set it — keep it that way.
+3. **Change the seeded passwords.** The bootstrap admin and demo accounts are flagged by an in-app
+   banner until their passwords change. Delete the demo user in Settings when you do not need it; the
+   login screen only advertises demo credentials while a default-password demo account exists.
+4. **Accounts are invite-only.** There is no signup route; the admin creates readers in Settings and
+   deleting a reader there removes their books, photos and sessions with the account.
+5. **Back up `data/`.** `scripts/nightly-backup.sh` snapshots the SQLite file and photos with 30-day
+   retention. Deleting `data/` deletes the library.
+
+The hardening contracts behind this list are pinned by `tests/hardening/` (auth and invite-only
+invariants, upload and export containment, SSRF/egress bounds, injection probes, headers and process
+flags) — if one of these ever regresses, `make test` fails loudly.
 
 ## 🧱 Tech
 

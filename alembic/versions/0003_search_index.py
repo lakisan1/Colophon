@@ -1,4 +1,4 @@
-"""M6 search: a real FTS5 index over the fields SPEC §9 says to search.
+"""Search: a real FTS5 index over the fields SPEC §9 says to search.
 
 The index is its own content table (not external content) with `rowid = books.id`,
 because the text a search has to hit is a *join*: title, subtitle, ISBN, publisher,

@@ -1,4 +1,4 @@
-# Schema tests for M1. Every test runs the real Alembic migration against its
+# Schema tests. Every test runs the real Alembic migration against its
 # own throwaway SQLite file (the dev database is never touched) and asserts the
 # rules the locked decisions impose: owner_id everywhere it belongs, decimal
 # series positions that sort correctly, one primary genre per book, the curated

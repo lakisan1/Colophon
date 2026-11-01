@@ -1,4 +1,4 @@
-# Login and logout (M5). The public surface is this screen and nothing else
+# Login and logout. The public surface is this screen and nothing else
 # (SPEC §13): every other route redirects here when there is no valid session.
 #
 # Failure messages stay deliberately vague. "Wrong password" tells an attacker the
@@ -7,7 +7,7 @@
 # just keeps typing.
 from __future__ import annotations
 
-from secrets import token_urlsafe
+from secrets import compare_digest, token_urlsafe
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth import (
+    _DUMMY_PASSWORD_HASH,
     CSRF_COOKIE,
     clear_failures,
     create_session,
@@ -39,8 +40,27 @@ LOCKED_MESSAGE = (
 )
 
 
+def _demo_hint(session: Session) -> bool:
+    """The login page's demo hint is honest: shown only while a demo account
+    exists AND still carries the seeded password. On a public install the login
+    screen is the one page strangers see, so once the demo user is deleted or
+    its password changed the page stops advertising credentials."""
+    from sqlalchemy.exc import OperationalError
+
+    from app.auth import find_user, uses_default_credentials
+
+    try:
+        demo = find_user(session, "demo")
+        return bool(demo and uses_default_credentials(session, int(demo["id"])))
+    except OperationalError:
+        return False
+
+
 @router.get("/login", response_class=HTMLResponse, include_in_schema=False)
-def login_form(request: Request) -> HTMLResponse:
+def login_form(
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> HTMLResponse:
     # One token, used in the form and mirrored into the cookie: the POST compares
     # the two. There is no session row yet, so the cookie is all we can match on.
     token = request.cookies.get(CSRF_COOKIE) or token_urlsafe(32)
@@ -55,6 +75,7 @@ def login_form(request: Request) -> HTMLResponse:
             error=None,
             csrf_token=token,
             theme="dark",
+            demo_hint=_demo_hint(session),
         ),
     )
     if not request.cookies.get(CSRF_COOKIE):
@@ -71,28 +92,34 @@ def login_form(request: Request) -> HTMLResponse:
 
 
 @router.post("/login", response_class=HTMLResponse, include_in_schema=False)
-async def login(
+def login(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     username: Annotated[str, Form(max_length=150)],
     password: Annotated[str, Form(max_length=200)],
     csrf_token: Annotated[str | None, Form()] = None,
 ) -> HTMLResponse:
+    # Plain def, not async: bcrypt (cost 12) is ~100 ms of blocking work, and on
+    # the single worker (T2) it belongs in FastAPI's threadpool, not the event
+    # loop that every other request is waiting on.
     cookie = request.cookies.get(CSRF_COOKIE)
     client_ip = request.client.host if request.client else None
 
-    if not csrf_token or not cookie or csrf_token != cookie:
-        return _rejected_login(request, "The sign-in form expired. Try again.")
+    if not csrf_token or not cookie or not compare_digest(csrf_token, cookie):
+        return _rejected_login(request, session, "The sign-in form expired. Try again.")
 
     identifiers = identifiers_for(ip=client_ip, username=username)
     if is_locked_out(session, identifiers):
-        return _rejected_login(request, LOCKED_MESSAGE)
+        return _rejected_login(request, session, LOCKED_MESSAGE)
 
     user = find_user(session, username.strip())
-    if user is None or not verify_password(password, user["password_hash"]):
+    # An unknown username verifies against a dummy hash, so both failure paths
+    # cost the same bcrypt work — response timing must not enumerate users.
+    stored_hash = user["password_hash"] if user else _DUMMY_PASSWORD_HASH
+    if not verify_password(password, stored_hash):
         # Recorded against both keys, so neither IP spraying nor account spraying works.
         record_failure(session, identifiers)
-        return _rejected_login(request, GENERIC_FAILURE)
+        return _rejected_login(request, session, GENERIC_FAILURE)
 
     clear_failures(session, identifiers)
     session_id, session_csrf = create_session(
@@ -122,7 +149,7 @@ def logout(
     return response
 
 
-def _rejected_login(request: Request, message: str) -> HTMLResponse:
+def _rejected_login(request: Request, session: Session, message: str) -> HTMLResponse:
     response = templates.TemplateResponse(
         request,
         "login.html",
@@ -132,6 +159,7 @@ def _rejected_login(request: Request, message: str) -> HTMLResponse:
             error=message,
             csrf_token=request.cookies.get(CSRF_COOKIE) or token_urlsafe(32),
             theme="dark",
+            demo_hint=_demo_hint(session),
         ),
         status_code=401,
     )

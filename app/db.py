@@ -13,7 +13,7 @@ from app.settings import settings
 
 
 class Base(DeclarativeBase):
-    """Declarative base for M1's tables; Alembic autogenerate reads Base.metadata."""
+    """Declarative base for the app's tables; Alembic autogenerate reads Base.metadata."""
 
 
 def _ensure_sqlite_dir(url: str) -> None:
@@ -36,6 +36,12 @@ def _set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA foreign_keys=ON")
+    # The FTS reindex triggers materialise temp b-trees; past a size threshold
+    # SQLite spills them to a temp FILE, and in a container or sandbox with an
+    # unwritable/oddly-behaving tmp that spill dies as a bare "unable to open
+    # database file" mid-transaction. A personal library's temp sets are tiny,
+    # so keeping them in memory is both faster and one less moving part.
+    cursor.execute("PRAGMA temp_store=MEMORY")
     cursor.close()
 
 

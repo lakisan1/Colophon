@@ -1,6 +1,6 @@
-# M2 seed fixture tests. PLAN §M2 asks for row-count and series-ordering
-# assertions plus idempotency; the rest of these guard the properties the later
-# milestones quietly depend on (every enum value reachable, dimensions
+# Seed fixture tests: row-count and series-ordering assertions plus
+# idempotency; the rest guard the properties the app quietly depends on (every
+# enum value reachable, dimensions
 # plausible, loans consistent with ownership, no invented ISBNs).
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ def test_duplicate_title_rows_differ_by_format(seeded: tuple[Engine, SeedSummary
 
 
 def test_no_isbn_is_invented_by_the_fixture(seeded: tuple[Engine, SeedSummary]) -> None:
-    """M4 supplies ISBNs; fake ones would resolve to the wrong book upstream."""
+    """The fixture invents no ISBNs; fake ones would resolve to the wrong book upstream."""
     engine, _ = seeded
     assert _count(engine, "SELECT count(*) FROM books WHERE isbn IS NOT NULL") == 0
 
@@ -334,7 +334,7 @@ def test_the_local_young_adult_notation_is_used(seeded: tuple[Engine, SeedSummar
 
 
 def test_provider_photo_rows_match_the_fixture(seeded: tuple[Engine, SeedSummary]) -> None:
-    """M7 writes the image bytes; these rows are its cache keys."""
+    """No image bytes ship with the fixture; these rows are the cache keys."""
     engine, _ = seeded
     expected_slots = sum(len(slots) for slots in PHOTO_PROVIDERS.values())
     assert _count(engine, "SELECT count(*) FROM photos") == expected_slots

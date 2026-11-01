@@ -1,4 +1,4 @@
-# Photo ingest (M4): validate, crop, strip metadata, store.
+# Photo ingest: validate, crop, strip metadata, store.
 #
 # Three things this module is responsible for, in order of how much they hurt to
 # get wrong. (1) Nothing user-controlled becomes a path: files are named by us,

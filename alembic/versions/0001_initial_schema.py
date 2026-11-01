@@ -1,12 +1,12 @@
-"""M1 initial schema: the nine PLAN tables plus the two link tables the many-to-many
+"""Initial schema: the nine core tables plus the two link tables the many-to-many
 relations need (book_authors, book_genres).
 
-Conventions baked in here, all documented in docs/ASSUMPTIONS.md:
+Conventions baked in here, all documented in docs/DECISIONS.md:
 - One row = one physical book (D2); no Work/Edition/Copy hierarchy.
 - owner_id on every row-owning table (D10), including link tables. Only `users`
   and the curated `genres` have none.
 - dates are ISO-8601 TEXT ('2027-08-27' / '2027-08-27T09:30:00Z'); display
-  formatting is an M5 settings concern.
+  formatting is a settings concern.
 - books.isbn holds the normalised ISBN-13 (CHECK length = 13); app/isbn.py does
   the normalising, duplicates are allowed (D3 warns, never blocks).
 - books.series_position is REAL so 1.5 sorts between 1 and 2 (D9); NULLs are put
@@ -17,7 +17,7 @@ Conventions baked in here, all documented in docs/ASSUMPTIONS.md:
   re-lookup can never overwrite a user's photo; display uses the upload first.
 - `settings` is one global row (owner_id NULL) plus optional per-user override
   rows; the global row is seeded with the SPEC §10 defaults. The admin account
-  is NOT seeded here — M5 owns auth and bootstrapping.
+  is NOT seeded here — the auth layer owns bootstrapping.
 """
 
 from collections.abc import Sequence
@@ -117,7 +117,7 @@ def upgrade() -> None:
         "users",
         sa.Column("id", sa.Integer, primary_key=True),
         sa.Column("username", sa.Text(collation="NOCASE"), nullable=False, unique=True),
-        # bcrypt hash, filled by M5. No admin row is seeded here on purpose.
+        # bcrypt hash, filled by the auth layer. No admin row is seeded here on purpose.
         sa.Column("password_hash", sa.Text, nullable=False),
         sa.Column("created_at", sa.Text, nullable=False, server_default=TIMESTAMP_DEFAULT),
     )

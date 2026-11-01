@@ -1,6 +1,6 @@
 # Alembic runtime. The database URL comes from app.settings — the same config the
 # app itself uses — so a migration can never silently target a different SQLite
-# file than the running application (T3). Empty by design in M0; M1 adds tables.
+# file than the running application (T3).
 from __future__ import annotations
 
 from logging.config import fileConfig

@@ -1,4 +1,4 @@
-# Book metadata lookup (M4). Providers live in the PROVIDERS registry below:
+# Book metadata lookup. Providers live in the PROVIDERS registry below:
 # Open Library is on for everyone, Google Books and ISBNdb are opted into per user
 # on the settings page. Keys are per-user only — a keyed provider is answered with
 # the key that reader pasted in Settings (their own settings row, provider_keys) and
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlparse
 
 import httpx
 
@@ -400,25 +400,64 @@ def _first_language(values) -> str | None:
     return None
 
 
+# Cover hosts the three providers actually serve (T6). The form's cover_url can
+# be typed or pre-filled from a lookup, so without this allowlist the server
+# would GET any URL a form names — internal hosts and cloud metadata included.
+ALLOWED_COVER_HOSTS = ("covers.openlibrary.org", "books.google.com", "images.isbndb.com")
+
+
+def _cover_host_allowed(url: str) -> bool:
+    host = urlparse(url).hostname or ""
+    return any(host == allowed or host.endswith("." + allowed) for allowed in ALLOWED_COVER_HOSTS)
+
+
+# A cover is at most a large-ish JPEG. Past this bound the bytes are not art —
+# they are an attempt to fill the single worker's RAM (T2) — so the fetch answers
+# None instead of allocating whatever the responding server sends.
+MAX_COVER_BYTES = 10 * 1024 * 1024
+# An open redirect on a provider host must not become a fetch of an internal
+# address, so redirects are followed one hop at a time and every hop is checked
+# against the allowlist again. Five hops is generous for an image CDN.
+MAX_COVER_REDIRECTS = 5
+_REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
+
+
 def fetch_provider_cover(url: str, *, timeout: float = DEFAULT_TIMEOUT) -> bytes | None:
     """Download one provider image for caching (T6: provider bytes, our filename).
 
     Returns None on any failure. A book saved without art is still a saved book,
     and the shelf has no business showing a stack trace because a cover host
     timed out.
+
+    Only https is fetched, and redirects are re-validated hop by hop: the URL is
+    form input, so an open redirect or a scheme downgrade on a provider host
+    must not turn this into a GET of an address the allowlist never saw.
+    Relative Locations resolve against the hop's URL, which keeps a provider
+    redirecting among its own paths working.
     """
-    if not url.startswith(("https://", "http://")):
+    if not url.startswith("https://") or not _cover_host_allowed(url):
         return None
     try:
         with CLIENT_FACTORY(
-            timeout=timeout, headers={"User-Agent": USER_AGENT}, follow_redirects=True
+            timeout=timeout, headers={"User-Agent": USER_AGENT}, follow_redirects=False
         ) as client:
             response = client.get(url)
+            for _ in range(MAX_COVER_REDIRECTS):
+                if response.status_code not in _REDIRECT_CODES:
+                    break
+                target = urljoin(str(response.url), response.headers.get("location", ""))
+                if not target.startswith("https://") or not _cover_host_allowed(target):
+                    return None
+                response = client.get(target)
+            else:
+                return None
             response.raise_for_status()
             content = response.content
     except httpx.HTTPError:
         return None
-    return content if content else None
+    if not content or len(content) > MAX_COVER_BYTES:
+        return None
+    return content
 
 
 # Open Library language keys -> readable names, used by the ISBN lookup.

@@ -1,4 +1,4 @@
-# The queries behind the four shelves (M6). Written as plain SQL on purpose
+# The queries behind the four shelves. Written as plain SQL on purpose
 # (SPEC §15): the joins — first-listed author, series, curated genre, cached cover —
 # are the thing a reader has to trust here, so they are written out rather than
 # assembled from ORM fragments.
@@ -121,14 +121,6 @@ def borrowed_rows(session: Session, owner_id: int, filters: Filters | None = Non
     where, params = where_clause(owner_id, filters)
     result = session.execute(text(_BORROWED_SQL.format(where=where)), params)
     return [dict(row._mapping) for row in result]
-
-
-def count_books(session: Session, owner_id: int, filters: Filters | None = None) -> int:
-    """How many books a filter matches, without building the shelf."""
-    where, params = where_clause(owner_id, filters)
-    # The shape is fixed here; `where` comes from Filters, never from a string.
-    statement = text(f"SELECT count(*) FROM books b WHERE {where}")
-    return int(session.execute(statement, params).scalar_one())
 
 
 # ---------------------------------------------------------------- filter options

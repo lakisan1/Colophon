@@ -1,4 +1,4 @@
-# Print year (M8): the year this physical copy came off the press.
+# Print year: the year this physical copy came off the press.
 #
 # Publication year answers "when was this edition published"; print year
 # answers "when was this copy printed", which differs for later printings.

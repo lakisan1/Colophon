@@ -1,4 +1,4 @@
-# Authentication and session rules (M5, SPEC §13, T8).
+# Authentication and session rules (SPEC §13, T8).
 #
 # The rules this module owns, stated once so the rest of the app can just ask:
 #   * passwords are bcrypt, verified with a constant-time comparison;
@@ -27,7 +27,6 @@ ABSOLUTE_LIFETIME = timedelta(days=90)
 MAX_FAILED_ATTEMPTS = 5
 ATTEMPT_WINDOW = timedelta(minutes=15)
 
-DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "admin"
 
 # Memo for the banner check. Comparing a bcrypt hash costs ~100 ms, which is far
@@ -68,6 +67,13 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     except ValueError:
         # A malformed stored hash is a failed login, never a stack trace.
         return False
+
+
+# A throwaway hash so a login attempt against an unknown username costs the same
+# bcrypt work as one against a real account — without it, response timing
+# enumerates which usernames exist (SPEC §13 keeps the message vague; this keeps
+# the timing vague too).
+_DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(18))
 
 
 # --------------------------------------------------------------------------
@@ -162,16 +168,6 @@ def revoke_session(session: Session, session_id: str) -> None:
     session.commit()
 
 
-def purge_expired_sessions(session: Session, now: datetime | None = None) -> int:
-    """Delete sessions past their cap. Called by the backup/health path in M7."""
-    moment = now or now_utc()
-    result = session.execute(
-        text("DELETE FROM sessions WHERE expires_at <= :now"), {"now": to_storage(moment)}
-    )
-    session.commit()
-    return int(result.rowcount or 0)
-
-
 # --------------------------------------------------------------------------
 # login throttling (T8)
 # --------------------------------------------------------------------------
@@ -211,15 +207,22 @@ def is_locked_out(session: Session, identifiers: list[str], now: datetime | None
 
 
 def record_failure(session: Session, identifiers: list[str], now: datetime | None = None) -> None:
-    moment = to_storage(now or now_utc())
+    moment = now or now_utc()
     for identifier in identifiers:
         session.execute(
             text(
                 "INSERT INTO login_attempts (identifier, failed_at)"
                 " VALUES (:identifier, :failed_at)"
             ),
-            {"identifier": identifier, "failed_at": moment},
+            {"identifier": identifier, "failed_at": to_storage(moment)},
         )
+    # Rows older than the window can no longer lock anybody out (is_locked_out
+    # counts only failed_at > window start), so dropping them on every failure
+    # keeps the table bounded under credential spraying without a cron job.
+    session.execute(
+        text("DELETE FROM login_attempts WHERE failed_at <= :cutoff"),
+        {"cutoff": to_storage(moment - ATTEMPT_WINDOW)},
+    )
     session.commit()
 
 
@@ -247,7 +250,12 @@ def find_user(session: Session, username: str) -> dict | None:
 
 
 def uses_default_credentials(session: Session, user_id: int) -> bool:
-    """True while this account's password is still the seeded default (D11)."""
+    """True while this account's password is still a known default (D11).
+
+    Both defaults count: admin/admin (the documented bootstrap pair) and
+    demo/demo (the account `make seed` writes). A public-facing instance must
+    not run on either, so the banner watches both with one memoised check.
+    """
     record = session.execute(
         text("SELECT password_hash FROM users WHERE id = :id"), {"id": user_id}
     ).first()
@@ -257,8 +265,14 @@ def uses_default_credentials(session: Session, user_id: int) -> bool:
     cache_key = (user_id, password_hash)
     cached = _default_password_cache.get(cache_key)
     if cached is None:
-        cached = verify_password(DEFAULT_PASSWORD, password_hash)
-        _default_password_cache.clear() if len(_default_password_cache) > 8 else None
+        from app.seed_data import DEMO_PASSWORD
+
+        cached = any(
+            verify_password(candidate, password_hash)
+            for candidate in (DEFAULT_PASSWORD, DEMO_PASSWORD)
+        )
+        if len(_default_password_cache) > 8:
+            _default_password_cache.clear()
         _default_password_cache[cache_key] = cached
     return cached
 

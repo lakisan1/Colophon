@@ -1,4 +1,4 @@
-# Idempotent dev/demo fixture loader (M2). Run it with `make seed` or
+# Idempotent dev/demo fixture loader. Run it with `make seed` or
 # `python -m app.seed`.
 #
 # Strategy: rebuild-from-scratch for the demo user only. Every run deletes that
@@ -301,7 +301,8 @@ def seed(engine: Engine, *, verbose: bool = False) -> SeedSummary:
                         "b": book_id,
                         "o": owner_id,
                         "s": slot,
-                        # Same shape M7 will write, so the cache path is testable now.
+                        # Same shape the cover cache writes, so the cache path is
+                        # testable without a live provider.
                         "f": f"openlibrary/{book_id}-{slot}.jpg",
                     },
                 )

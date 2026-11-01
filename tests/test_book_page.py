@@ -174,7 +174,7 @@ def test_the_page_is_read_only(seeded_db: tuple[TestClient, Engine]) -> None:
 def test_a_photo_row_without_a_file_never_renders_a_broken_image(
     seeded_db: tuple[TestClient, Engine],
 ) -> None:
-    """The M2 fixture writes `photos` rows that only name a provider file; the bytes
+    """The seed fixture writes `photos` rows that only name a provider file; the bytes
     are downloaded by the lookup, and a download can fail after the row exists. An
     `<img>` pointing at such a row is a broken icon in the middle of the record, so
     the page asks the same question the serving route asks: are there bytes?"""

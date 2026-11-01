@@ -56,7 +56,7 @@
 })();
 
 
-// Open Library ISBN lookup (M4): typing an ISBN prefills the book fields.
+// Open Library ISBN lookup: typing an ISBN prefills the book fields.
 // Best-effort enhancement — if Open Library is unreachable, nothing is filled
 // and the person still types by hand. Never overwrites what is already there.
 (function () {

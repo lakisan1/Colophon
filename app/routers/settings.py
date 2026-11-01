@@ -1,7 +1,7 @@
-# Settings (M5): display preferences and the password.
+# Settings: display preferences and the password.
 #
 # Preferences live in the per-user `settings` row; the global row keeps the site
-# defaults for anyone without one (M1's resolution order). Password changes drop
+# defaults for anyone without one. Password changes drop
 # every session for that user, because a stolen-cookie scenario is exactly the
 # reason someone changes a password.
 from __future__ import annotations

@@ -28,4 +28,8 @@ USER colophon
 EXPOSE 8000
 
 # T3: migrations run at container start. T2: exactly one uvicorn worker, always.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+# --proxy-headers makes uvicorn honour X-Forwarded-For/Proto from trusted
+# addresses only (FORWARDED_ALLOW_IPS, default 127.0.0.1): behind a reverse
+# proxy the per-IP login lockout must key on the real client IP, not the proxy,
+# or five bad logins from one attacker lock out every reader at once.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers"]

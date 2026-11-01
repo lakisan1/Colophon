@@ -36,6 +36,9 @@ def engine_for(db_path: Path) -> Engine:
     def _fk_on(dbapi_connection, _record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        # Parity with app/db.py: the FTS reindex triggers spill large temp
+        # b-trees to a temp file, which fails under some sandboxes/containers.
+        cursor.execute("PRAGMA temp_store=MEMORY")
         cursor.close()
 
     return engine

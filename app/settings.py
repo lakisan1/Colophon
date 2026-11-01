@@ -1,6 +1,7 @@
-# Environment-driven configuration gathered in one place so secrets and file paths
-# never hide inside feature code. Every knob is an environment variable; the only
-# hardcoded value is an obviously-named dev fallback for SECRET_KEY, never a secret.
+# Environment-driven configuration gathered in one place so file paths and
+# feature knobs never hide inside feature code. Every knob is an environment
+# variable. There is deliberately no secret here: sessions are random tokens in
+# the database, not signed cookies, so there is nothing to configure.
 from __future__ import annotations
 
 import os
@@ -12,10 +13,6 @@ from pathlib import Path
 # anywhere.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Used only when COLOPHON_SECRET_KEY is unset, i.e. local development. Shipped
-# value is public, so it is a loud placeholder rather than a real signing key.
-DEV_FALLBACK_SECRET_KEY = "colophon-dev-insecure-secret-change-me"
-
 
 def _env_flag(name: str) -> bool:
     """A flag env var is on only when it is exactly '1' — anything else is off."""
@@ -26,7 +23,6 @@ def _env_flag(name: str) -> bool:
 class Settings:
     """Mutable dataclass so tests can flip fields via monkeypatch.setattr."""
 
-    secret_key: str
     database_url: str
     upload_dir: str
     backup_dir: str
@@ -47,7 +43,6 @@ def load_settings() -> Settings:
     # copies so one volume mount carries the library and its recovery plan.
     backup_dir = _project_path(os.environ.get("COLOPHON_BACKUP_DIR", "data/backups"))
     return Settings(
-        secret_key=os.environ.get("COLOPHON_SECRET_KEY", DEV_FALLBACK_SECRET_KEY),
         database_url=f"sqlite:///{db_path}",
         upload_dir=str(upload_dir),
         backup_dir=str(backup_dir),

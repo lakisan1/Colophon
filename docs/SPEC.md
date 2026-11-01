@@ -71,8 +71,7 @@ Shelf organisation: sections **by genre**; within a section, sort by **series nu
 ## 4. Genres and the BISAC source (corrected per T12)
 
 - Genres are a **hardcoded curated list keyed by BISAC notation**. No user-defined genres in
-  the UI; extending the list is a code change in `app/genres.py` (D4). Note: `DECISIONS.md`
-  writes `app/regenres.py` — a typo; the actual file is `app/genres.py`.
+  the UI; extending the list is a code change in `app/genres.py` (D4).
 - **Source:** `edsu/bisac` @ master `bisac.json`, re-verified against the downloaded file:
   **3,737 entries**, 700,893 bytes, `sha256 0a2a6f2807d7af16649714d1ab5f6d37e68b6ddc42775d072bc8c100276ccf9a`.
   BISAC is the industry standard (BISG); `edsu/bisac` is its open, machine-readable rendition.
@@ -88,7 +87,7 @@ Shelf organisation: sections **by genre**; within a section, sort by **series nu
   Mystery are *not* top-level categories in `edsu/bisac`; Fiction (`FIC`, 98 entries under 54
   second-level labels) is therefore **expanded to the second level**. **No label contains
   `Young Adult` at all**; a `LOCAL/YA` entry is added as a deliberate, documented deviation (T12).
-- The shipped list is curated to ~45 entries (see `docs/ASSUMPTIONS.md`, 2027-08-27) because
+- The shipped list is curated to ~45 entries because
   the raw 51 top-levels bury all fiction in one bucket.
 - OpenLibrary subjects and Google Books categories are **mapped** onto these entries where
   possible. Anything that does not fit falls back to free text with autocomplete from the
@@ -103,7 +102,7 @@ Shelf organisation: sections **by genre**; within a section, sort by **series nu
 - A series badge is drawn on the spine; series position is the primary sort within a genre
   section (D6). This matters a lot for large sequences (e.g. Warhammer / Horus Heresy).
 
-## 6. Shelf rendering (A1–A8; all flagged `[ASSUMPTION]`, vetoable)
+## 6. Shelf rendering (A1–A8)
 
 - **A1 Scale:** height is always strictly linear in millimetres. Reference height 240 mm;
   `scale = shelf_row_px / 240`.
@@ -206,11 +205,6 @@ module opens with 2–3 lines saying *why* it exists, three similar lines beat a
 else can follow, no framework magic or generic base classes, plain SQL over ORM tricks. Fix
 technical debt the moment it is noticed instead of leaving a TODO.
 
-Licensed AGPL-3.0. Local git only, one commit per milestone, never push (no remote — see
-`docs/GITHUB.md`).
+Licensed AGPL-3.0. Development happens on GitHub.
 
-## 16. Build order
 
-Milestones M0–M7 are defined in `docs/PLAN.md`: scaffold → schema → seed fixture → shelf →
-add/edit + lookup + photos → auth + settings → shelves 2–4/search/stats/export → hardening +
-packaging.

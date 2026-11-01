@@ -1,4 +1,4 @@
-# Nightly backups (SPEC §14, T10; PLAN M7 verify).
+# Nightly backups (SPEC §14, T10).
 #
 # Backups are the one feature whose failure is invisible until the day it is needed,
 # so every test here works on a throwaway library in `tmp_path` (the dev database and
@@ -44,7 +44,7 @@ from app.templating import STATIC_DIR
 from app.tools import backup as backup_cli
 from tests.alembic_runner import engine_for, run_alembic
 
-# A title that exists exactly once in the M2 fixture, so a SELECT and an FTS MATCH
+# A title that exists exactly once in the seed fixture, so a SELECT and an FTS MATCH
 # against it cannot be satisfied by some other book.
 KNOWN_TITLE = "Neuromancer"
 
@@ -80,7 +80,7 @@ class Library:
 
 @pytest.fixture()
 def library(tmp_path: Path) -> Library:
-    """The M2 fixture database, plus a photo that actually exists on disk.
+    """The seed fixture database, plus a photo that actually exists on disk.
 
     The seeded `photos` rows carry provider filenames only — rows with no file behind
     them, which app/routers/books.py has to cope with — so a backup test built on the
@@ -196,7 +196,7 @@ def source_revision(db_path: Path) -> str:
 
 
 def test_the_full_circle_backup_destroy_restore(library: Library) -> None:
-    """PLAN M7: back up, destroy the originals, restore, and nothing was lost."""
+    """Back up, destroy the originals, restore, and nothing was lost."""
     books_before, photos_before = counts(library.engine)
     assert books_before == library.summary.books
     known_id = book_id(library.engine, KNOWN_TITLE)

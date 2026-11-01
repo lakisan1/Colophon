@@ -1,4 +1,4 @@
-{# Settings (M5): display preferences and the password. #}
+{# Settings: display preferences and the password. #}
 {% extends "base.html" %}
 
 {% block head %}
@@ -164,27 +164,7 @@
     {% endif %}
   </div>
 
-  <script>
-    {# Switching every provider off is a preference the server accepts, so the ask
-       lives here: unticking the last box is more likely a slip than a decision,
-       and the consequence (a New book lookup that answers nothing) is invisible
-       on this page. No box ticked on submit asks once; confirming submits. #}
-    (function () {
-      var form = document.querySelector('form.card[method="post"][action="/settings"]');
-      if (!form) {
-        return;
-      }
-      form.addEventListener("submit", function (event) {
-        if (form.querySelector('input[name^="provider_"]:checked')) {
-          return;
-        }
-        var sure = window.confirm(
-          "Are you sure you want to disable all search providers? The New book lookup won't work."
-        );
-        if (!sure) {
-          event.preventDefault();
-        }
-      });
-    })();
-  </script>
+  {# The confirm-before-disabling-every-provider script lives in a static file so
+     the CSP can hold at script-src 'self' with no unsafe-inline. #}
+  <script src="/static/js/settings.js" defer></script>
 {% endblock %}
